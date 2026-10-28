@@ -26,6 +26,8 @@ stress-test-llm/
 ├── config.js                    # Konfigurasi endpoint, model, & profil beban
 ├── run_benchmark.sh             # Script runner otomatis
 ├── package.json                 # Script shortcut npm
+├── dashboards/
+│   └── grafana_dashboard.json   # Definisi dashboard monitoring Grafana
 ├── data/
 │   ├── short_context_1k.json    # Prompt pendek (~1.000 tokens)
 │   └── long_context_128k.json   # Dokumen konteks panjang (~128.000 tokens)
@@ -80,7 +82,7 @@ Format perintah: `./run_benchmark.sh [skenario: 1|2|3|4|all] [profil: smoke|runp
 
 Dashboard resmi telah terpasang di Grafana:
 * 🔗 **Direct URL:** [https://grafana.linkit360.ai/d/llm-dgx-runpod/llm-benchmark3a-dgx-vs-runpod-a6000](https://grafana.linkit360.ai/d/llm-dgx-runpod/llm-benchmark3a-dgx-vs-runpod-a6000)
-* 📁 **File Konfigurasi:** [`grafana_dashboard.json`](file:///Users/alfarizy/Desktop/Project/stress-test-llm/grafana_dashboard.json)
+* 📁 **File Konfigurasi:** [`dashboards/grafana_dashboard.json`](file:///Users/alfarizy/Desktop/Project/stress-test-llm/dashboards/grafana_dashboard.json)
 
 Untuk mengalirkan metrik K6 secara live saat pengujian:
 ```bash
