@@ -1,0 +1,368 @@
+{
+  "dashboard": {
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Grafana --"
+          },
+          "enable": true,
+          "hide": true,
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+      {
+        "collapsed": false,
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+        "id": 100,
+        "title": "📌 Key Performance Indicators (Matriks PM)",
+        "type": "row"
+      },
+      {
+        "id": 1,
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+        "title": "Active Virtual Users (Concurrency)",
+        "type": "stat",
+        "datasource": { "type": "prometheus", "uid": "cfbguq4609p8gd" },
+        "targets": [
+          {
+            "expr": "k6_vus or k6_vus_max or vector(0)",
+            "refId": "A",
+            "legendFormat": "Active VUs"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "blue", "value": null },
+                { "color": "orange", "value": 10 },
+                { "color": "green", "value": 72 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+        "title": "Time-To-First-Token (TTFT)",
+        "type": "stat",
+        "datasource": { "type": "prometheus", "uid": "cfbguq4609p8gd" },
+        "targets": [
+          {
+            "expr": "(k6_llm_ttft_ms or k6_trend_llm_ttft_ms_p90 or k6_http_req_waiting) / 1000",
+            "refId": "A",
+            "legendFormat": "TTFT"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 1.5 },
+                { "color": "red", "value": 3.5 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+        "title": "Generation Speed (Tokens / Sec)",
+        "type": "stat",
+        "datasource": { "type": "prometheus", "uid": "cfbguq4609p8gd" },
+        "targets": [
+          {
+            "expr": "k6_llm_tokens_per_second or k6_trend_llm_tokens_per_second_avg or vector(0)",
+            "refId": "A",
+            "legendFormat": "TPS / Stream"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "red", "value": null },
+                { "color": "yellow", "value": 30 },
+                { "color": "green", "value": 72 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+        "title": "OOM & Server Failure Rate",
+        "type": "stat",
+        "datasource": { "type": "prometheus", "uid": "cfbguq4609p8gd" },
+        "targets": [
+          {
+            "expr": "k6_llm_oom_failures or (sum(rate(k6_http_reqs{status=~\"5..|429\"}[1m])) / sum(rate(k6_http_reqs[1m]))) or vector(0)",
+            "refId": "A",
+            "legendFormat": "Failure Rate"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 0.02 },
+                { "color": "red", "value": 0.05 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "collapsed": false,
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+        "id": 101,
+        "title": "📈 Evaluasi Latensi & Throughput (DGX vs Runpod)",
+        "type": "row"
+      },
+      {
+        "id": 5,
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+        "title": "Time-To-First-Token (TTFT) Under Load",
+        "description": "Target PM: DGX < 1.2s (Hijau) | Runpod A6000 > 3.5s (Merah)",
+        "type": "timeseries",
+        "datasource": { "type": "prometheus", "uid": "cfbguq4609p8gd" },
+        "targets": [
+          {
+            "expr": "k6_llm_ttft_ms / 1000",
+            "legendFormat": "TTFT (detik)",
+            "refId": "A"
+          },
+          {
+            "expr": "k6_http_req_waiting / 1000",
+            "legendFormat": "HTTP Waiting (TTFB/TTFT)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 15,
+              "thresholdsStyle": { "mode": "line" }
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 1.5 },
+                { "color": "red", "value": 3.5 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+        "title": "Generation Speed (Tokens/Sec Per Stream)",
+        "description": "Target PM: DGX 72-95+ tokens/s | Runpod A6000 15-25 tokens/s",
+        "type": "timeseries",
+        "datasource": { "type": "prometheus", "uid": "cfbguq4609p8gd" },
+        "targets": [
+          {
+            "expr": "k6_llm_tokens_per_second",
+            "legendFormat": "Speed (Tokens/s)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "thresholdsStyle": { "mode": "line" }
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "red", "value": null },
+                { "color": "yellow", "value": 30 },
+                { "color": "green", "value": 72 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "collapsed": false,
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+        "id": 102,
+        "title": "⚡ Kapasitas Konkurensi & Deteksi OOM",
+        "type": "row"
+      },
+      {
+        "id": 7,
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+        "title": "Virtual Users Ramping (Concurrency)",
+        "description": "Batas OOM Runpod: ~4-8 VUs | Target DGX: 72+ VUs",
+        "type": "timeseries",
+        "datasource": { "type": "prometheus", "uid": "cfbguq4609p8gd" },
+        "targets": [
+          {
+            "expr": "k6_vus",
+            "legendFormat": "Active VUs",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 25
+            },
+            "color": { "mode": "fixed", "fixedColor": "light-blue" }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+        "title": "HTTP 200 vs OOM / 5xx Errors",
+        "description": "Lonjakan error 500/504 menandakan VRAM KV-Cache OOM",
+        "type": "timeseries",
+        "datasource": { "type": "prometheus", "uid": "cfbguq4609p8gd" },
+        "targets": [
+          {
+            "expr": "sum(rate(k6_http_reqs{status=\"200\"}[30s]))",
+            "legendFormat": "HTTP 200 (Success)",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(k6_http_reqs{status=~\"5..|429\"}[30s]))",
+            "legendFormat": "HTTP 5xx/429 (OOM Failures)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "drawStyle": "bars",
+              "fillOpacity": 50,
+              "stacking": { "mode": "normal", "group": "A" }
+            }
+          },
+          "overrides": [
+            {
+              "matcher": { "id": "byName", "options": "HTTP 200 (Success)" },
+              "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+            },
+            {
+              "matcher": { "id": "byName", "options": "HTTP 5xx/429 (OOM Failures)" },
+              "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+            }
+          ]
+        }
+      },
+      {
+        "id": 9,
+        "gridPos": { "h": 7, "w": 24, "x": 0, "y": 23 },
+        "title": "Akumulasi Token (Prompt 128k vs Completion Tokens)",
+        "type": "timeseries",
+        "datasource": { "type": "prometheus", "uid": "cfbguq4609p8gd" },
+        "targets": [
+          {
+            "expr": "k6_llm_prompt_tokens",
+            "legendFormat": "Input Tokens (128k Payload)",
+            "refId": "A"
+          },
+          {
+            "expr": "k6_llm_completion_tokens",
+            "legendFormat": "Output Tokens (Generated)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          }
+        }
+      }
+    ],
+    "refresh": "5s",
+    "schemaVersion": 39,
+    "tags": ["llm", "k6", "benchmark", "dgx", "runpod"],
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m"]
+    },
+    "timezone": "browser",
+    "title": "LLM Benchmark: DGX vs Runpod (A6000)",
+    "uid": "llm-dgx-runpod",
+    "version": 1
+  },
+  "overwrite": true
+}

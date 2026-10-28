@@ -1,0 +1,30 @@
+# Environment files & secrets
+.env
+.env.*
+*.env
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+id_rsa
+id_ed25519
+
+# Dependency directories
+node_modules/
+
+# Mac OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# K6 & test artifacts
+reports/
+*.html
+*.log
+summary.json
+test-results/
+
+# Temporary files
+scratch/
+tmp/

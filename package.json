@@ -1,0 +1,24 @@
+{
+  "name": "stress-test-llm",
+  "version": "1.0.0",
+  "description": "K6 Stress Test & GPU Capacity Benchmark: DGX vs Runpod (A6000)",
+  "main": "config.js",
+  "scripts": {
+    "test:smoke": "./run_benchmark.sh 1 smoke",
+    "test:runpod": "./run_benchmark.sh 1 runpod",
+    "test:dgx": "./run_benchmark.sh 1 dgx",
+    "test:all": "./run_benchmark.sh all dgx"
+  },
+  "keywords": [
+    "k6",
+    "llm",
+    "stress-test",
+    "benchmark",
+    "vllm",
+    "dgx",
+    "runpod",
+    "a6000"
+  ],
+  "author": "",
+  "license": "ISC"
+}
