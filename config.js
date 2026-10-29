@@ -3,10 +3,37 @@
  * Benchmark: DGX vs Runpod (A6000 Ada)
  */
 
+function resolveBaseUrl() {
+  const profile = (__ENV.PROFILE || 'smoke').toLowerCase();
+  if (profile === 'runpod' || profile === 'a6000' || profile === 'smoke_runpod') {
+    return __ENV.LLM_RUNPOD_URL || __ENV.LLM_BASE_URL || 'https://llm.linkit360.ai/v1/chat/completions';
+  }
+  if (profile === 'dgx' || profile === 'h200' || profile === 'smoke_dgx') {
+    return __ENV.LLM_DGX_URL || __ENV.LLM_BASE_URL || 'https://llm.linkit360.ai/v1/chat/completions';
+  }
+  // Default untuk smoke test umum: pakai DGX jika ada, lalu Runpod, lalu fallback
+  return __ENV.LLM_DGX_URL || __ENV.LLM_RUNPOD_URL || __ENV.LLM_BASE_URL || 'https://llm.linkit360.ai/v1/chat/completions';
+}
+
+function resolveApiKey() {
+  const profile = (__ENV.PROFILE || 'smoke').toLowerCase();
+  if (profile === 'runpod' || profile === 'a6000' || profile === 'smoke_runpod') {
+    return __ENV.LLM_RUNPOD_API_KEY || __ENV.LLM_API_KEY || '';
+  }
+  if (profile === 'dgx' || profile === 'h200' || profile === 'smoke_dgx') {
+    return __ENV.LLM_DGX_API_KEY || __ENV.LLM_API_KEY || '';
+  }
+  return __ENV.LLM_DGX_API_KEY || __ENV.LLM_RUNPOD_API_KEY || __ENV.LLM_API_KEY || '';
+}
+
 export const CONFIG = {
-  // LLM Endpoint & Kredensial (Bisa di-override lewat -e LLM_BASE_URL=...)
-  BASE_URL: __ENV.LLM_BASE_URL || 'https://llm.linkit360.ai/v1/chat/completions',
-  API_KEY: __ENV.LLM_API_KEY || '',
+  // LLM Endpoint & Kredensial (Bisa per-profile atau via LLM_BASE_URL)
+  get BASE_URL() {
+    return resolveBaseUrl();
+  },
+  get API_KEY() {
+    return resolveApiKey();
+  },
   MODEL: __ENV.LLM_MODEL || 'Qwen3.6-35B-A3B',
 
   // Parameter Inferensi

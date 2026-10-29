@@ -23,9 +23,22 @@ PROFILE=${2:-"smoke"}
 
 mkdir -p reports
 
+if [ "$PROFILE" = "runpod" ] || [ "$PROFILE" = "a6000" ] || [ "$PROFILE" = "smoke_runpod" ]; then
+  ACTIVE_URL="${LLM_RUNPOD_URL:-$LLM_BASE_URL}"
+  SERVER_LABEL="Runpod (RTX A6000 Ada)"
+elif [ "$PROFILE" = "dgx" ] || [ "$PROFILE" = "h200" ] || [ "$PROFILE" = "smoke_dgx" ]; then
+  ACTIVE_URL="${LLM_DGX_URL:-$LLM_BASE_URL}"
+  SERVER_LABEL="Server DGX (High-VRAM)"
+else
+  ACTIVE_URL="${LLM_DGX_URL:-${LLM_RUNPOD_URL:-$LLM_BASE_URL}}"
+  SERVER_LABEL="Smoke Test / Default"
+fi
+
 echo "=========================================================="
-echo "  K6 LLM STRESS TEST: DGX vs RUNPOD (A6000)"
-echo "  Skenario: $SCENARIO | Profil Target: $PROFILE"
+echo "  K6 LLM STRESS TEST: DGX vs RUNPOD"
+echo "  Skenario:   $SCENARIO"
+echo "  Profil:     $PROFILE ($SERVER_LABEL)"
+echo "  Target URL: $ACTIVE_URL"
 echo "=========================================================="
 
 run_k6() {
@@ -33,7 +46,13 @@ run_k6() {
   local name=$2
   echo ""
   echo ">>> [RUNNING] $name (Profile: $PROFILE)"
-  k6 run -e PROFILE="$PROFILE" "$script"
+
+  local k6_args=(-e "PROFILE=$PROFILE")
+  if [ -n "$PROMETHEUS_REMOTE_WRITE_URL" ] && [ "$DISABLE_PROMETHEUS" != "true" ]; then
+    k6_args+=(-o "experimental-prometheus-rw=$PROMETHEUS_REMOTE_WRITE_URL")
+  fi
+
+  k6 run "${k6_args[@]}" "$script"
 }
 
 case "$SCENARIO" in
@@ -66,6 +85,12 @@ case "$SCENARIO" in
 esac
 
 echo ""
+echo ">>> Menggabungkan laporan ke HTML konsolidasi..."
+node utils/consolidate_reports.js "$PROFILE" || true
+
+echo ""
 echo "=========================================================="
-echo "  Pengujian Selesai! Laporan tersimpan di folder 'reports/'"
+echo "  Pengujian Selesai! Laporan utama tersimpan di:"
+echo "  - reports/report_${PROFILE}.html"
+echo "  - reports/report_comparison_dgx_vs_runpod.html"
 echo "=========================================================="

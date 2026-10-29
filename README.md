@@ -21,9 +21,9 @@ Suite pengujian beban (*stress test*) K6 untuk membandingkan kapasitas dan kesta
 
 ```text
 stress-test-llm/
-├── .env / .env.example          # Kredensial endpoint & token (git-ignored)
+├── .env / .env.example          # Kredensial endpoint Runpod & DGX (git-ignored)
 ├── README.md                    # Dokumentasi lengkap & panduan uji
-├── config.js                    # Konfigurasi endpoint, model, & profil beban
+├── config.js                    # Konfigurasi endpoint terpisah & profil beban
 ├── run_benchmark.sh             # Script runner otomatis
 ├── package.json                 # Script shortcut npm
 ├── dashboards/
@@ -34,7 +34,8 @@ stress-test-llm/
 ├── utils/
 │   ├── metrics.js               # Definisi custom metrics (TTFT, TPS, OOM)
 │   ├── request_helper.js        # Engine HTTP POST + Parser SSE streaming
-│   └── summary_reporter.js      # Generator HTML report & JSON summary
+│   ├── summary_reporter.js      # Generator HTML report & JSON summary per skenario
+│   └── consolidate_reports.js   # Generator laporan konsolidasi & perbandingan Head-to-Head
 └── scenarios/
     ├── 01_thinking_short.js     # Skenario 1: Thinking ON + Short Context (1k)
     ├── 02_thinking_long.js      # Skenario 2: Thinking ON + Long Context (128k)
@@ -95,6 +96,21 @@ k6 run \
 
 ---
 
-## 📄 Hasil Laporan Visual HTML
+## 📄 Hasil Laporan Visual HTML & Summary JSON
+ 
+Setiap kali pengujian dijalankan, K6 dan generator laporan otomatis menghasilkan laporan visual HTML interaktif di folder `reports/`:
 
-Setiap selesai pengujian, K6 otomatis men-generate laporan visual HTML interaktif di folder `reports/` (misal `reports/01_thinking_short_1k_report.html`) yang dapat langsung dibuka di browser untuk dibagikan ke PM dan Tim Engineering.
+### 🏆 3 Laporan Utama untuk PM & Tim Dev:
+1. 📊 **[`reports/report_runpod.html`](file:///Users/alfarizy/Desktop/Project/stress-test-llm/reports/report_runpod.html)**
+   * Merangkum seluruh performa 4 skenario pada server **Runpod (RTX A6000 Ada)**.
+2. 📊 **[`reports/report_dgx.html`](file:///Users/alfarizy/Desktop/Project/stress-test-llm/reports/report_dgx.html)**
+   * Merangkum seluruh performa 4 skenario pada **Server DGX**.
+3. ⚔️ **[`reports/report_comparison_dgx_vs_runpod.html`](file:///Users/alfarizy/Desktop/Project/stress-test-llm/reports/report_comparison_dgx_vs_runpod.html)**
+   * Laporan **Head-to-Head Comparison** yang membandingkan performa DGX vs Runpod secara berdampingan (*side-by-side*) langsung mengacu pada Matriks Target PM.
+
+File `.html` ini bersifat *standalone* (dapat dibuka langsung di browser seperti Chrome, Safari, atau Firefox) dan dilengkapi tombol navigasi untuk berpindah antar laporan dengan satu klik.
+
+Untuk me-refresh atau membuat ulang laporan kapan saja, jalankan:
+```bash
+npm run report
+```

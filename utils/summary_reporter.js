@@ -10,15 +10,17 @@ import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
  */
 export function generateSummaryReport(data, scenarioName) {
   const safeName = scenarioName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const profile = (__ENV.PROFILE || 'smoke').toLowerCase();
+  const filePrefix = `${safeName}_${profile}`;
   
   const outputs = {
     stdout: textSummary(data, { indent: ' ', enableColors: true }),
-    [`reports/${safeName}_summary.json`]: JSON.stringify(data, null, 2),
+    [`reports/${filePrefix}_summary.json`]: JSON.stringify(data, null, 2),
   };
 
   try {
-    outputs[`reports/${safeName}_report.html`] = htmlReport(data, {
-      title: `LLM Stress Test - ${scenarioName}`,
+    outputs[`reports/${filePrefix}_report.html`] = htmlReport(data, {
+      title: `LLM Benchmark [${profile.toUpperCase()}] - ${scenarioName}`,
     });
   } catch (err) {
     console.warn(`[WARN] Gagal membuat HTML report via bundle: ${err.message}`);
