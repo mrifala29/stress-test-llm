@@ -81,6 +81,9 @@ run_k6() {
       echo ">>> [PERINGATAN] Run selesai dengan exit code $exit_code."
     fi
   }
+
+  # Perbarui laporan HTML seketika setiap skenario selesai agar selalu ada dan live
+  node utils/consolidate_reports.js "$PROFILE" >/dev/null 2>&1 || true
 }
 
 run_ctx() {

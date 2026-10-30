@@ -278,7 +278,7 @@ function maxPassedContext(results, thinking) {
 }
 
 function totals(results) {
-  const t = { run: 0, passed: 0, failed: 0, retries: 0, oom: 0, timeout: 0, noresp: 0, r429: 0, c4xx: 0, requests: 0, failedReq: 0, minSafeVU: 100 };
+  const t = { run: 0, passed: 0, failed: 0, retries: 0, oom: 0, timeout: 0, noresp: 0, r429: 0, c4xx: 0, requests: 0, failedReq: 0, minSafeVU: 1000 };
   for (const sc of SCENARIOS) {
     const x = results[sc.id];
     if (!x) continue;
