@@ -6,7 +6,7 @@ import { Trend, Counter, Rate } from 'k6/metrics';
  * - Time-To-First-Token (TTFT)
  * - Peak & Sustained Generation Speed (Tokens/sec per stream)
  * - Throughput & Token Counter
- * - Out-Of-Memory (OOM) Failure Rate
+ * - Retry & rincian penyebab kegagalan (OOM/timeout/429/4xx)
  */
 export const METRICS = {
   // Latensi waktu hingga token pertama diterima (Time to First Token) dalam ms
@@ -27,26 +27,50 @@ export const METRICS = {
   // Total akumulasi tokens (prompt + completion)
   totalTokens: new Counter('llm_total_tokens'),
 
-  // Rate error kegagalan server / OOM / timeout (HTTP 500, 502, 503, 504, 429, atau 0)
-  oomFailures: new Rate('llm_oom_failures'),
-
-  // Rate keberhasilan request (HTTP 200)
+  // Rate keberhasilan FINAL per request (setelah retry). false = dinyatakan FAILED.
   successfulRequests: new Rate('llm_success_rate'),
+
+  // Jumlah percobaan ulang (retry) yang dilakukan
+  retries: new Counter('llm_retries'),
+
+  // Rincian penyebab kegagalan per percobaan (attempt)
+  failOom: new Counter('llm_fail_oom_5xx'),      // HTTP 5xx (OOM / server error)
+  failTimeout: new Counter('llm_fail_timeout'),  // status 0 (timeout / koneksi terputus)
+  failRateLimit: new Counter('llm_fail_429'),    // HTTP 429 (overload / antrean penuh)
+  failClient: new Counter('llm_fail_4xx'),       // HTTP 4xx lain (mis. konteks melebihi batas) - tidak di-retry
 };
 
+/** Klasifikasi status HTTP: 'ok' | 'oom' | 'timeout' | 'ratelimit' | 'client' */
+export function classifyStatus(status) {
+  if (status === 200) return 'ok';
+  if (status === 0) return 'timeout';
+  if (status === 429) return 'ratelimit';
+  if (status >= 500) return 'oom';
+  return 'client';
+}
+
+/** Hanya OOM/overload yang di-retry */
+export function isRetryable(status) {
+  const c = classifyStatus(status);
+  return c === 'oom' || c === 'timeout' || c === 'ratelimit';
+}
+
+/** Catat satu percobaan yang gagal */
+export function recordFailedAttempt(status) {
+  const c = classifyStatus(status);
+  if (c === 'oom') METRICS.failOom.add(1);
+  else if (c === 'timeout') METRICS.failTimeout.add(1);
+  else if (c === 'ratelimit') METRICS.failRateLimit.add(1);
+  else if (c === 'client') METRICS.failClient.add(1);
+}
+
 /**
- * Helper untuk mencatat metrik request non-streaming / streaming
+ * Catat hasil final satu request (setelah retry).
+ * Metrik performa hanya dicatat jika berhasil.
  */
 export function recordMetrics({ status, ttftMs, e2eDurationMs, completionTokens, promptTokens }) {
   const isSuccess = status === 200;
   METRICS.successfulRequests.add(isSuccess);
-
-  // Jika status 5xx, 429, atau 0 (timeout / connection aborted karena overload), tandai sebagai failure
-  if (status >= 500 || status === 429 || status === 0) {
-    METRICS.oomFailures.add(1);
-  } else {
-    METRICS.oomFailures.add(0);
-  }
 
   if (isSuccess) {
     if (ttftMs !== undefined && ttftMs !== null && ttftMs > 0) {

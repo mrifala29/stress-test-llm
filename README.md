@@ -12,8 +12,8 @@ Suite pengujian beban (*stress test*) K6 untuk membandingkan kapasitas dan kesta
 | **Peak Generation Speed** | ~30 – 45 tokens/detik (Single User) | ~150 – 170+ tokens/detik | `llm_tokens_per_second` (Profile: 1 VU) |
 | **Throughput Multi-User** | ~15 – 25 tokens/detik per stream | ~72 – 95+ tokens/detik per stream | `llm_tokens_per_second` (Stress Profile) |
 | **Time-to-First-Token (TTFT)** | Latensi tinggi (>3.5s pada long context) | Ultra-low latency (<0.8s – 1.2s) | `llm_ttft_ms` via SSE stream TTFB |
-| **Max Concurrent Users** | ~4 – 8 loops (rentan OOM) | 72+ highly concurrent agentic loops | `llm_oom_failures` pada Ramping VUs |
-| **Max Context Window** | Terbatas (~16K – 32K di bawah beban) | Full context (Diuji pada 128K tokens) | Payload `data/long_context_128k.json` |
+| **Max Concurrent Users** | ~4 – 8 loops (rentan OOM) | 72+ highly concurrent agentic loops | `llm_fail_*` & `llm_retries` pada Ramping VUs |
+| **Max Context Window** | Hingga 64K | Hingga 64K | Payload `data/context_{1k..64k}.json` |
 
 ---
 
@@ -22,60 +22,50 @@ Suite pengujian beban (*stress test*) K6 untuk membandingkan kapasitas dan kesta
 ```text
 stress-test-llm/
 ├── .env / .env.example          # Kredensial endpoint Runpod & DGX (git-ignored)
-├── README.md                    # Dokumentasi lengkap & panduan uji
-├── config.js                    # Konfigurasi endpoint terpisah & profil beban
+├── config.js                    # Endpoint & profil beban (sama untuk Runpod & DGX, maks 100 VU)
 ├── run_benchmark.sh             # Script runner otomatis
-├── package.json                 # Script shortcut npm
-├── dashboards/
-│   └── grafana_dashboard.json   # Definisi dashboard monitoring Grafana
-├── data/
-│   ├── short_context_1k.json    # Prompt pendek (~1.000 tokens)
-│   └── long_context_128k.json   # Dokumen konteks panjang (~128.000 tokens)
+├── scripts/generate_payloads.js # Generator payload konteks 1k..64k
+├── data/context_{1k,2k,4k,16k,32k,64k}.json
+├── scenarios/benchmark.js       # Skenario parametrik (CONTEXT, THINKING)
 ├── utils/
-│   ├── metrics.js               # Definisi custom metrics (TTFT, TPS, OOM)
-│   ├── request_helper.js        # Engine HTTP POST + Parser SSE streaming
-│   ├── summary_reporter.js      # Generator HTML report & JSON summary per skenario
-│   └── consolidate_reports.js   # Generator laporan konsolidasi & perbandingan Head-to-Head
-└── scenarios/
-    ├── 01_thinking_short.js     # Skenario 1: Thinking ON + Short Context (1k)
-    ├── 02_thinking_long.js      # Skenario 2: Thinking ON + Long Context (128k)
-    ├── 03_no_thinking_short.js  # Skenario 3: Thinking OFF + Short Context (1k)
-    └── 04_no_thinking_long.js   # Skenario 4: Thinking OFF + Long Context (128k)
+│   ├── metrics.js               # Custom metrics (TTFT, TPS, retry, penyebab gagal)
+│   ├── request_helper.js        # HTTP POST + parser SSE + retry 3x
+│   ├── summary_reporter.js      # JSON summary per skenario
+│   └── consolidate_reports.js   # Generator laporan HTML + kesimpulan
+└── dashboards/grafana_dashboard.json
 ```
+
+---
+
+## 🧪 Skenario Uji (12 per server)
+
+| Kategori | Konteks | Thinking |
+| :--- | :--- | :--- |
+| Short | 1k, 2k, 4k, 16k | ON & OFF |
+| Long | 32k, 64k (maksimum 64k) | ON & OFF |
+
+* **Profil beban sama untuk kedua server:** 1 → 10 → 25 → 50 → 75 → 100 VU → 0.
+* **Retry:** request yang kena OOM/overload (HTTP 5xx, 429, timeout) diulang hingga **3x**. Jika tetap gagal dinyatakan **FAILED**. Error 4xx tidak di-retry.
+* Skenario **PASSED** bila success rate final ≥ 95%. Setiap laporan HTML memiliki bagian **Kesimpulan** di bagian paling bawah.
 
 ---
 
 ## 🚀 Cara Menjalankan Pengujian
 
-Format perintah: `./run_benchmark.sh [skenario: 1|2|3|4|all] [profil: smoke|runpod|dgx]`
+Format: `./run_benchmark.sh [target] [profil: smoke|runpod|dgx]`
 
-* **Smoke Test (Sanity Check 1 VU):**
-  ```bash
-  ./run_benchmark.sh 1 smoke
-  ```
+Target: `1k|2k|4k|16k|32k|64k` (thinking ON & OFF), `<ctx>:on|off`, `short`, `long`, `all`.
 
-* **Uji Runpod (A6000 Ada) — Uji Titik OOM (1 $\rightarrow$ 4 $\rightarrow$ 8 $\rightarrow$ 12 VUs):**
-  ```bash
-  # Skenario 1: Thinking ON (1k context)
-  ./run_benchmark.sh 1 runpod
+```bash
+node scripts/generate_payloads.js    # sekali, bila data/ belum ada
+./run_benchmark.sh 1k smoke          # sanity check
+./run_benchmark.sh short runpod      # 1k, 2k, 4k, 16k
+./run_benchmark.sh long runpod       # 32k, 64k
+./run_benchmark.sh 64k:on dgx        # satu skenario
+./run_benchmark.sh all dgx           # seluruh 12 skenario
+```
 
-  # Skenario 2: Thinking ON (128k context) - cek batas OOM KV-Cache
-  ./run_benchmark.sh 2 runpod
-  ```
-
-* **Uji Server DGX — Uji Konkurensi Tinggi (5 $\rightarrow$ 20 $\rightarrow$ 50 $\rightarrow$ 75 $\rightarrow$ 90 VUs):**
-  ```bash
-  # Skenario 1: Thinking ON (1k context)
-  ./run_benchmark.sh 1 dgx
-
-  # Skenario 2: Thinking ON (128k context) - validasi 72+ concurrent loops
-  ./run_benchmark.sh 2 dgx
-  ```
-
-* **Jalankan Keempat Skenario Berturut-turut:**
-  ```bash
-  ./run_benchmark.sh all dgx
-  ```
+Variabel opsional: `-e MAX_TOKENS=4096`, `-e MAX_RETRIES=3`, `-e TIMEOUT_MS=...` (default menyesuaikan ukuran konteks).
 
 ---
 
@@ -89,8 +79,8 @@ Untuk mengalirkan metrik K6 secara live saat pengujian:
 ```bash
 k6 run \
   -o experimental-prometheus-rw=${PROMETHEUS_REMOTE_WRITE_URL:-http://<PROMETHEUS_HOST>:9600/api/v1/push} \
-  -e PROFILE=dgx \
-  scenarios/01_thinking_short.js
+  -e PROFILE=dgx -e CONTEXT=1k -e THINKING=on \
+  scenarios/benchmark.js
 ```
 *Panel di Grafana akan langsung menampilkan lonjakan Concurrency (VUs), TTFT real-time, Tokens/sec per stream, dan mendeteksi titik OOM (HTTP 500).*
 
@@ -102,9 +92,9 @@ Setiap kali pengujian dijalankan, K6 dan generator laporan otomatis menghasilkan
 
 ### 🏆 3 Laporan Utama untuk PM & Tim Dev:
 1. 📊 **[`reports/report_runpod.html`](file:///Users/alfarizy/Desktop/Project/stress-test-llm/reports/report_runpod.html)**
-   * Merangkum seluruh performa 4 skenario pada server **Runpod (RTX A6000 Ada)**.
+   * Merangkum seluruh performa 12 skenario pada server **Runpod (RTX A6000 Ada)**.
 2. 📊 **[`reports/report_dgx.html`](file:///Users/alfarizy/Desktop/Project/stress-test-llm/reports/report_dgx.html)**
-   * Merangkum seluruh performa 4 skenario pada **Server DGX**.
+   * Merangkum seluruh performa 12 skenario pada **Server DGX**.
 3. ⚔️ **[`reports/report_comparison_dgx_vs_runpod.html`](file:///Users/alfarizy/Desktop/Project/stress-test-llm/reports/report_comparison_dgx_vs_runpod.html)**
    * Laporan **Head-to-Head Comparison** yang membandingkan performa DGX vs Runpod secara berdampingan (*side-by-side*) langsung mengacu pada Matriks Target PM.
 

@@ -1,6 +1,6 @@
 /**
  * Konfigurasi Utama K6 LLM Stress Testing Suite
- * Benchmark: DGX vs Runpod (A6000 Ada)
+ * Benchmark: DGX vs Runpod (A6000 Ada) - konteks 1k s/d 64k
  */
 
 function resolveBaseUrl() {
@@ -26,6 +26,15 @@ function resolveApiKey() {
   return __ENV.LLM_DGX_API_KEY || __ENV.LLM_RUNPOD_API_KEY || __ENV.LLM_API_KEY || '';
 }
 
+// Ukuran konteks yang didukung (maksimum 64k)
+export const SHORT_CONTEXTS = ['1k', '2k', '4k', '16k'];
+export const LONG_CONTEXTS = ['32k', '64k'];
+
+function timeoutForContext(ctx) {
+  const map = { '1k': 120000, '2k': 120000, '4k': 120000, '16k': 180000, '32k': 300000, '64k': 600000 };
+  return map[ctx] || 300000;
+}
+
 export const CONFIG = {
   // LLM Endpoint & Kredensial (Bisa per-profile atau via LLM_BASE_URL)
   get BASE_URL() {
@@ -43,8 +52,11 @@ export const CONFIG = {
   // Streaming diaktifkan agar K6 bisa menghitung Time-To-First-Token (TTFT)
   STREAM: __ENV.STREAM === 'false' ? false : true,
 
-  // Timeout request (300s / 5 menit untuk concurrent queue & long context 128k)
-  TIMEOUT_MS: __ENV.TIMEOUT_MS ? parseInt(__ENV.TIMEOUT_MS) : 300000,
+  // Timeout request per ukuran konteks (bisa dioverride via TIMEOUT_MS)
+  TIMEOUT_MS: __ENV.TIMEOUT_MS ? parseInt(__ENV.TIMEOUT_MS) : timeoutForContext(__ENV.CONTEXT || '1k'),
+
+  // Retry untuk error OOM/overload (5xx, 429, timeout). Setelah itu dinyatakan FAILED.
+  MAX_RETRIES: __ENV.MAX_RETRIES ? parseInt(__ENV.MAX_RETRIES) : 3,
 
   getHeaders() {
     return {
@@ -69,33 +81,26 @@ export const LOAD_PROFILES = {
     ],
   },
 
-  // 2. Profil Runpod - RTX A6000 Ada (48GB VRAM, batas ~4-8 concurrent users)
-  runpod: {
+  // 2. Profil beban standar - dipakai SAMA untuk Runpod dan DGX (hingga 100 VU)
+  //    agar perbandingan head-to-head setara.
+  standard: {
     stages: [
-      { duration: '1m', target: 1 },  // Baseline single user
-      { duration: '2m', target: 4 },  // Beban normal
-      { duration: '3m', target: 8 },  // Batas saturasi
-      { duration: '2m', target: 12 }, // Overload untuk cek titik OOM / HTTP 500
-      { duration: '1m', target: 0 },  // Cooldown
-    ],
-  },
-
-  // 3. Profil DGX (High-Memory Architecture, target 72+ concurrent users)
-  dgx: {
-    stages: [
-      { duration: '1m', target: 5 },   // Warmup
-      { duration: '2m', target: 20 },  // Mid load
-      { duration: '3m', target: 50 },  // Heavy batching
-      { duration: '3m', target: 75 },  // Target 72+ concurrent loops
-      { duration: '2m', target: 90 },  // Peak capacity limit
-      { duration: '1m', target: 0 },   // Cooldown
+      { duration: '1m', target: 1 },    // Baseline single user
+      { duration: '2m', target: 10 },
+      { duration: '2m', target: 25 },
+      { duration: '2m', target: 50 },
+      { duration: '2m', target: 75 },
+      { duration: '2m', target: 100 },  // Peak
+      { duration: '1m', target: 0 },    // Cooldown
     ],
   },
 };
 
+LOAD_PROFILES.runpod = LOAD_PROFILES.standard;
+LOAD_PROFILES.dgx = LOAD_PROFILES.standard;
 // Aliases agar tetap fleksibel jika memakai nama lama
-LOAD_PROFILES.a6000 = LOAD_PROFILES.runpod;
-LOAD_PROFILES.h200 = LOAD_PROFILES.dgx;
+LOAD_PROFILES.a6000 = LOAD_PROFILES.standard;
+LOAD_PROFILES.h200 = LOAD_PROFILES.standard;
 
 export function getSelectedProfile() {
   const profileName = (__ENV.PROFILE || 'smoke').toLowerCase();

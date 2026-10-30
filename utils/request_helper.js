@@ -1,7 +1,7 @@
 import http from 'k6/http';
-import { check } from 'k6';
+import { check, sleep } from 'k6';
 import { CONFIG } from '../config.js';
-import { recordMetrics } from './metrics.js';
+import { METRICS, recordMetrics, recordFailedAttempt, isRetryable, classifyStatus } from './metrics.js';
 
 /**
  * Eksekusi pengujian HTTP LLM ke /v1/chat/completions
@@ -51,8 +51,23 @@ export function executeLLMRequest({ messages, enableThinking, scenarioName = 'll
     }
   };
 
+  // Kirim request; untuk OOM/overload (5xx, 429, timeout) coba ulang hingga MAX_RETRIES kali.
+  // Jika tetap gagal dinyatakan FAILED. Error 4xx tidak di-retry.
   const startTime = Date.now();
-  const res = http.post(CONFIG.BASE_URL, payloadString, params);
+  let res;
+  let attempt = 0;
+  while (true) {
+    res = http.post(CONFIG.BASE_URL, payloadString, params);
+    if (res.status === 200) break;
+
+    recordFailedAttempt(res.status);
+    console.error(`[FAIL] ${scenarioName} attempt ${attempt + 1}/${CONFIG.MAX_RETRIES + 1} HTTP ${res.status} (${classifyStatus(res.status)}): ${res.body ? String(res.body).substring(0, 200) : 'No body'}`);
+
+    if (!isRetryable(res.status) || attempt >= CONFIG.MAX_RETRIES) break;
+    attempt++;
+    METRICS.retries.add(1);
+    sleep(2 * attempt); // backoff 2s, 4s, 6s
+  }
   const totalDuration = Date.now() - startTime;
 
   const isSuccess = check(res, {
@@ -110,16 +125,13 @@ export function executeLLMRequest({ messages, enableThinking, scenarioName = 'll
         console.warn(`[WARN] Gagal parse JSON body non-streaming: ${e.message}`);
       }
     }
-  } else {
-    // Catat jika ada error (500, 502, 503, 504 OOM atau 429)
-    console.error(`[FAIL] ${scenarioName} HTTP ${res.status}: ${res.body ? res.body.substring(0, 200) : 'No body'}`);
   }
 
   // Rekam ke custom metrics K6
   recordMetrics({
     status: res.status,
     ttftMs: ttftMs,
-    e2eDurationMs: res.timings.duration || totalDuration,
+    e2eDurationMs: res.timings.duration || totalDuration, // durasi attempt yang berhasil
     completionTokens: completionTokens,
     promptTokens: promptTokens,
   });

@@ -137,7 +137,7 @@
         "datasource": { "type": "prometheus", "uid": "cfbguq4609p8gd" },
         "targets": [
           {
-            "expr": "k6_llm_oom_failures or (sum(rate(k6_http_reqs{status=~\"5..|429\"}[1m])) / sum(rate(k6_http_reqs[1m]))) or vector(0)",
+            "expr": "(1 - k6_llm_success_rate_rate) or (sum(rate(k6_http_reqs{status=~\"5..|429\"}[1m])) / sum(rate(k6_http_reqs[1m]))) or vector(0)",
             "refId": "A",
             "legendFormat": "Failure Rate"
           }
@@ -321,13 +321,13 @@
       {
         "id": 9,
         "gridPos": { "h": 7, "w": 24, "x": 0, "y": 23 },
-        "title": "Akumulasi Token (Prompt 128k vs Completion Tokens)",
+        "title": "Akumulasi Token (Prompt vs Completion Tokens)",
         "type": "timeseries",
         "datasource": { "type": "prometheus", "uid": "cfbguq4609p8gd" },
         "targets": [
           {
             "expr": "k6_llm_prompt_tokens",
-            "legendFormat": "Input Tokens (128k Payload)",
+            "legendFormat": "Input Tokens (Payload)",
             "refId": "A"
           },
           {

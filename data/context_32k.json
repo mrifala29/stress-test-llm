@@ -1,0 +1,2093 @@
+{
+  "description": "Context payload 32k (~32768 tokens nominal, multi-turn)",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Kamu adalah arsitek sistem AI dan akselerator hardware. Berikan analisis teknis komparatif yang mendalam, terstruktur, dan presisi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 1] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 1] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 2] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 2] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 3] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 3] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 4] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 4] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 5] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 5] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 6] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 6] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 7] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 7] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 8] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 8] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 9] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 9] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 10] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 10] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 11] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 11] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 12] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 12] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 13] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 13] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 14] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 14] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 15] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 15] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 16] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 16] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 17] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 17] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 18] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 18] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 19] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 19] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 20] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 20] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 21] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 21] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 22] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 22] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 23] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 23] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 24] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 24] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 25] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 25] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 26] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 26] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 27] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 27] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 28] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 28] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 29] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 29] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 30] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 30] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 31] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 31] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 32] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 32] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 33] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 33] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 34] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 34] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 35] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 35] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 36] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 36] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 37] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 37] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 38] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 38] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 39] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 39] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 40] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 40] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 41] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 41] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 42] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 42] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 43] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 43] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 44] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 44] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 45] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 45] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 46] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 46] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 47] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 47] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 48] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 48] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 49] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 49] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 50] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 50] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 51] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 51] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 52] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 52] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 53] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 53] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 54] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 54] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 55] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 55] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 56] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 56] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 57] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 57] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 58] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 58] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 59] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 59] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 60] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 60] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 61] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 61] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 62] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 62] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 63] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 63] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 64] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 64] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 65] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 65] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 66] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 66] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 67] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 67] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 68] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 68] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 69] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 69] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 70] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 70] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 71] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 71] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 72] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 72] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 73] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 73] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 74] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 74] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 75] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 75] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 76] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 76] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 77] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 77] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 78] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 78] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 79] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 79] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 80] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 80] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 81] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 81] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 82] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 82] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 83] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 83] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 84] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 84] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 85] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 85] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 86] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 86] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 87] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 87] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 88] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 88] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 89] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 89] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 90] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 90] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 91] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 91] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 92] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 92] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 93] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 93] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 94] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 94] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 95] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 95] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 96] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 96] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 97] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 97] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 98] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 98] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 99] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 99] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 100] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 100] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 101] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 101] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 102] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 102] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 103] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 103] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 104] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 104] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 105] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 105] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 106] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 106] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 107] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 107] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 108] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 108] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 109] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 109] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 110] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 110] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 111] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 111] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 112] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 112] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 113] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 113] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 114] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 114] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 115] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 115] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 116] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 116] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 117] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 117] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 118] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 118] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 119] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 119] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 120] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 120] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 121] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 121] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 122] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 122] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 123] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 123] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 124] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 124] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 125] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 125] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 126] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 126] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 127] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 127] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 128] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 128] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 129] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 129] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 130] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 130] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 131] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 131] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 132] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 132] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 133] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 133] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 134] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 134] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 135] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 135] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 136] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 136] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 137] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 137] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 138] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 138] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 139] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 139] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 140] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 140] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 141] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 141] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 142] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 142] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 143] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 143] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 144] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 144] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 145] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 145] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 146] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 146] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 147] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 147] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 148] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 148] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 149] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 149] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 150] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 150] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 151] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 151] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 152] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 152] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 153] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 153] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 154] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 154] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 155] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 155] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 156] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 156] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 157] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 157] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 158] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 158] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 159] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 159] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 160] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 160] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 161] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 161] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 162] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 162] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 163] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 163] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 164] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 164] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 165] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 165] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 166] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 166] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 167] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 167] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 168] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 168] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 169] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 169] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 170] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 170] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 171] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 171] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 172] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 172] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 173] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 173] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 174] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 174] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 175] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 175] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 176] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 176] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 177] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 177] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 178] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 178] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 179] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 179] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 180] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 180] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 181] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 181] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 182] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 182] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 183] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 183] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 184] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 184] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 185] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 185] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 186] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 186] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 187] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 187] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 188] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 188] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 189] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 189] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 190] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 190] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 191] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 191] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 192] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 192] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 193] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 193] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 194] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 194] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 195] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 195] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 196] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 196] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 197] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 197] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 198] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 198] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 199] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 199] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 200] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 200] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 201] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 201] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 202] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 202] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 203] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 203] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 204] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 204] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 205] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 205] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 206] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 206] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 207] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 207] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 208] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 208] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 209] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 209] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 210] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 210] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 211] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 211] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 212] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 212] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 213] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 213] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 214] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 214] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 215] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 215] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 216] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 216] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 217] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 217] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 218] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 218] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 219] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 219] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 220] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 220] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 221] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 221] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 222] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 222] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 223] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 223] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 224] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 224] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 225] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 225] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 226] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 226] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 227] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 227] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 228] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 228] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 229] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 229] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 230] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 230] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 231] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 231] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 232] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 232] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 233] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 233] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 234] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 234] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 235] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 235] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 236] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 236] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 237] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 237] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 238] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 238] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 239] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 239] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 240] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 240] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 241] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 241] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 242] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 242] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 243] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 243] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 244] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 244] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 245] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 245] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 246] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 246] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 247] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 247] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 248] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 248] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 249] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 249] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 250] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 250] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 251] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 251] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 252] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 252] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 253] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 253] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 254] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 254] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 255] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 255] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 256] Jelaskan perbedaan karakteristik komputasi antara GPU workstation 48GB GDDR6 dan server DGX berbasis HBM untuk inferensi model Mixture-of-Experts."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 256] Memori HBM memiliki bandwidth jauh lebih tinggi dibanding GDDR6, sehingga fase decode yang bersifat memory-bound berjalan lebih cepat. Kapasitas memori yang lebih besar juga memungkinkan KV-cache menampung lebih banyak request konkuren tanpa preemption. Pada GPU 48GB, bobot model mengambil sebagian besar VRAM sehingga sisa ruang untuk KV-cache terbatas dan batch efektif menyusut ketika konteks memanjang. Akibatnya antrean request bertambah dan latensi tail meningkat tajam saat konkurensi tinggi."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 257] Bagaimana KV-cache tumbuh terhadap panjang konteks dan jumlah request konkuren pada vLLM?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 257] Ukuran KV-cache bertambah linear terhadap jumlah token dan jumlah layer attention. Untuk konteks panjang, satu request saja dapat memakai beberapa gigabyte. Dengan banyak request konkuren, scheduler vLLM harus melakukan preemption atau menolak request ketika blok KV habis, yang tampak sebagai error 5xx, 429, atau timeout pada klien."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 258] Apa dampak prefix caching dan chunked prefill terhadap Time-To-First-Token pada konteks panjang?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 258] Prefill pada konteks panjang bersifat compute-bound dan dapat memblokir decode request lain. Chunked prefill memecah prefill menjadi potongan kecil agar decode tetap berjalan, namun TTFT request panjang tetap naik. Prefix caching membantu hanya jika prefix identik, sehingga pengujian beban perlu menyisipkan tag unik agar prefill benar-benar dihitung."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 259] Jelaskan trade-off antara tensor parallelism dan expert parallelism untuk model A3B."
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 259] Tensor parallelism membagi setiap layer lintas GPU dan menambah komunikasi all-reduce, sedangkan expert parallelism menempatkan expert berbeda pada GPU berbeda sehingga lebih efisien untuk model dengan banyak expert tetapi parameter aktif kecil. Pilihan terbaik bergantung pada interkoneksi dan pola routing token."
+    },
+    {
+      "role": "user",
+      "content": "[Turn 260] Bagaimana strategi batching kontinu mempengaruhi throughput per stream saat beban naik?"
+    },
+    {
+      "role": "assistant",
+      "content": "[Turn 260] Continuous batching memasukkan request baru ke batch yang sedang berjalan sehingga utilisasi GPU tinggi. Namun ketika jumlah request aktif melebihi kapasitas, TPS per stream turun karena bandwidth memori dibagi ke lebih banyak sekuens, dan request baru menunggu di antrean waiting."
+    },
+    {
+      "role": "user",
+      "content": "Berdasarkan seluruh diskusi di atas, buat ringkasan teknis dan rekomendasi kapasitas yang terstruktur."
+    }
+  ]
+}

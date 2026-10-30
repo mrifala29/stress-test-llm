@@ -1,30 +1,36 @@
 #!/usr/bin/env bash
 
-# K6 LLM Stress Test Runner (DGX vs Runpod A6000)
+# K6 LLM Stress Test Runner (DGX vs Runpod)
 # Penggunaan:
-#   ./run_benchmark.sh [scenario: 1|2|3|4|all] [profile: smoke|runpod|dgx]
+#   ./run_benchmark.sh [target] [profile: smoke|runpod|dgx]
+#
+# target:
+#   <ctx>        satu ukuran konteks: 1k|2k|4k|16k|32k|64k  (thinking ON & OFF)
+#   <ctx>:on|off satu skenario spesifik, mis. 64k:off
+#   short        1k, 2k, 4k, 16k
+#   long         32k, 64k
+#   all          semua ukuran (1k..64k)
+#   clean        hapus laporan
 # Contoh:
-#   ./run_benchmark.sh 1 smoke
-#   ./run_benchmark.sh 2 runpod
-#   ./run_benchmark.sh 2 dgx
+#   ./run_benchmark.sh 1k smoke
+#   ./run_benchmark.sh short runpod
+#   ./run_benchmark.sh 64k:on dgx
 #   ./run_benchmark.sh all dgx
 
-# Otomatis muat environment variables dari file .env jika ada
 if [ -f .env ]; then
   set -a
   source .env
   set +a
 fi
 
-SCENARIO=${1:-"1"}
+TARGET=${1:-"1k"}
 PROFILE=${2:-"smoke"}
 
 if [ "$1" = "clean" ]; then
   echo ">>> Membersihkan seluruh file laporan di folder 'reports/'..."
   rm -rf reports/*
   mkdir -p reports/raw
-  node utils/consolidate_reports.js > /dev/null 2>&1 || true
-  echo "[OK] Folder 'reports/' sudah bersih dan direset ke kondisi awal."
+  echo "[OK] Folder 'reports/' sudah bersih."
   exit 0
 fi
 
@@ -43,64 +49,69 @@ fi
 
 echo "=========================================================="
 echo "  K6 LLM STRESS TEST: DGX vs RUNPOD"
-echo "  Skenario:   $SCENARIO"
+echo "  Target:     $TARGET"
 echo "  Profil:     $PROFILE ($SERVER_LABEL)"
 echo "  Target URL: $ACTIVE_URL"
 echo "=========================================================="
 
 run_k6() {
-  local script=$1
-  local name=$2
+  local ctx=$1
+  local thinking=$2
   echo ""
-  echo ">>> [RUNNING] $name (Profile: $PROFILE)"
+  echo ">>> [RUNNING] Thinking ${thinking} | Context ${ctx} (Profile: $PROFILE)"
 
-  # Jalankan K6 tanpa abort jika threshold SLA terlampaui (exit code 99 biasa terjadi pada stress test)
-  k6 run -e "PROFILE=$PROFILE" "$script" || {
+  # Exit code 99 = threshold SLA terlewati (normal pada stress test), tidak menghentikan rangkaian uji
+  k6 run -e "PROFILE=$PROFILE" -e "CONTEXT=$ctx" -e "THINKING=$thinking" scenarios/benchmark.js || {
     local exit_code=$?
     if [ $exit_code -eq 99 ]; then
-      echo ">>> [CATATAN] Ambang batas (SLA Thresholds) terlewati pada $name (Exit Code 99: Overload/Degraded)."
+      echo ">>> [CATATAN] SLA threshold terlewati (Thinking ${thinking}, ${ctx}) - Exit Code 99."
     else
-      echo ">>> [PERINGATAN] $name selesai dengan exit code $exit_code."
+      echo ">>> [PERINGATAN] Run selesai dengan exit code $exit_code."
     fi
   }
 }
 
-case "$SCENARIO" in
-  1)
-    run_k6 "scenarios/01_thinking_short.js" "Scenario 1: Thinking ON + Short Context (1k)"
+run_ctx() {
+  run_k6 "$1" on
+  sleep 3
+  run_k6 "$1" off
+  sleep 3
+}
+
+case "$TARGET" in
+  1k|2k|4k|16k|32k|64k)
+    run_ctx "$TARGET"
     ;;
-  2)
-    run_k6 "scenarios/02_thinking_long.js" "Scenario 2: Thinking ON + Long Context (128k)"
+  1k:on|2k:on|4k:on|16k:on|32k:on|64k:on)
+    run_k6 "${TARGET%%:*}" on
     ;;
-  3)
-    run_k6 "scenarios/03_no_thinking_short.js" "Scenario 3: Thinking OFF + Short Context (1k)"
+  1k:off|2k:off|4k:off|16k:off|32k:off|64k:off)
+    run_k6 "${TARGET%%:*}" off
     ;;
-  4)
-    run_k6 "scenarios/04_no_thinking_long.js" "Scenario 4: Thinking OFF + Long Context (128k)"
+  short)
+    for c in 1k 2k 4k 16k; do run_ctx $c; done
+    ;;
+  long)
+    for c in 32k 64k; do run_ctx $c; done
     ;;
   all)
-    echo "Menjalankan seluruh 4 skenario..."
-    run_k6 "scenarios/01_thinking_short.js" "Scenario 1: Thinking ON (1k)"
-    sleep 3
-    run_k6 "scenarios/03_no_thinking_short.js" "Scenario 3: Thinking OFF (1k)"
-    sleep 3
-    run_k6 "scenarios/02_thinking_long.js" "Scenario 2: Thinking ON (128k)"
-    sleep 3
-    run_k6 "scenarios/04_no_thinking_long.js" "Scenario 4: Thinking OFF (128k)"
+    for c in 1k 2k 4k 16k 32k 64k; do run_ctx $c; done
     ;;
   *)
-    echo "Pilihan skenario tidak valid! Gunakan: 1, 2, 3, 4, atau all"
+    echo "Target tidak valid! Gunakan: 1k|2k|4k|16k|32k|64k, <ctx>:on|off, short, long, all, clean"
     exit 1
     ;;
 esac
 
 echo ""
-echo ">>> Menggabungkan laporan ke HTML konsolidasi..."
+echo ">>> Membuat laporan HTML..."
 node utils/consolidate_reports.js "$PROFILE" || true
 
 echo ""
 echo "=========================================================="
-echo "  Pengujian Selesai! Laporan utama tersimpan di:"
-echo "  - reports/report_${PROFILE}.html"
+echo "  Pengujian Selesai! Laporan:"
+echo "  - reports/report_runpod.html"
+echo "  - reports/report_dgx.html"
 echo "  - reports/report_comparison_dgx_vs_runpod.html"
+echo "  - reports/raw/*.html (per skenario)"
 echo "=========================================================="

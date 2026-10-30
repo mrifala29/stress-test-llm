@@ -1,604 +1,539 @@
 /**
- * Consolidator Laporan K6 LLM Stress Test (DGX vs Runpod)
- * Menggabungkan seluruh 4 skenario menjadi 3 laporan utama:
- * 1. reports/report_runpod.html (Seluruh skenario Runpod)
- * 2. reports/report_dgx.html (Seluruh skenario DGX)
- * 3. reports/report_comparison_dgx_vs_runpod.html (Perbandingan Head-to-Head DGX vs Runpod)
+ * Konsolidator Laporan K6 LLM Stress Test (DGX vs Runpod)
+ *
+ * Membaca reports/raw/*_summary.json dan menghasilkan, dengan tema seragam:
+ *  1. reports/raw/<skenario>_<profil>_report.html (laporan per skenario)
+ *  2. reports/report_runpod.html                  (seluruh skenario Runpod)
+ *  3. reports/report_dgx.html                     (seluruh skenario DGX)
+ *  4. reports/report_comparison_dgx_vs_runpod.html (head-to-head)
+ *
+ * Setiap laporan ditutup dengan bagian Kesimpulan.
  */
 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const reportsDir = path.join(__dirname, '..', 'reports');
+const rawDir = path.join(reportsDir, 'raw');
+fs.mkdirSync(rawDir, { recursive: true });
 
-if (!fs.existsSync(reportsDir)) {
-  fs.mkdirSync(reportsDir, { recursive: true });
-}
-
-// Baca konfigurasi .env untuk mendapatkan URL aktif Runpod dan DGX
-const envPath = path.join(__dirname, '..', '.env');
+// ---------- Konfigurasi dari .env ----------
 const envVars = {};
+const envPath = path.join(__dirname, '..', '.env');
 if (fs.existsSync(envPath)) {
-  const content = fs.readFileSync(envPath, 'utf8');
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith('#')) {
-      const idx = trimmed.indexOf('=');
-      if (idx > -1) {
-        const key = trimmed.slice(0, idx).trim();
-        const val = trimmed.slice(idx + 1).trim();
-        envVars[key] = val;
-      }
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const t = line.trim();
+    if (t && !t.startsWith('#')) {
+      const i = t.indexOf('=');
+      if (i > -1) envVars[t.slice(0, i).trim()] = t.slice(i + 1).trim();
     }
   }
 }
-
-const runpodUrl = envVars.LLM_RUNPOD_URL || envVars.LLM_BASE_URL || 'https://llm.linkit360.ai/v1/chat/completions';
-const dgxUrl = envVars.LLM_DGX_URL || envVars.LLM_BASE_URL || 'https://llm.linkit360.ai/v1/chat/completions';
+const DEFAULT_URL = 'https://llm.linkit360.ai/v1/chat/completions';
+const runpodUrl = envVars.LLM_RUNPOD_URL || envVars.LLM_BASE_URL || DEFAULT_URL;
+const dgxUrl = envVars.LLM_DGX_URL || envVars.LLM_BASE_URL || DEFAULT_URL;
 const modelName = envVars.LLM_MODEL || 'Qwen3.6-35B-A3B';
 
-const SCENARIO_DEFS = [
-  { id: '01_thinking_short_1k', name: 'Skenario 1: Thinking ON + Short Context (1k)', shortName: 'Thinking ON (1k)', thinking: true, context: '1k' },
-  { id: '02_thinking_long_128k', name: 'Skenario 2: Thinking ON + Long Context (128k)', shortName: 'Thinking ON (128k)', thinking: true, context: '128k' },
-  { id: '03_no_thinking_short_1k', name: 'Skenario 3: Thinking OFF + Short Context (1k)', shortName: 'Thinking OFF (1k)', thinking: false, context: '1k' },
-  { id: '04_no_thinking_long_128k', name: 'Skenario 4: Thinking OFF + Long Context (128k)', shortName: 'Thinking OFF (128k)', thinking: false, context: '128k' },
-];
+// ---------- Definisi skenario ----------
+const SHORT_CONTEXTS = ['1k', '2k', '4k', '16k'];
+const LONG_CONTEXTS = ['32k', '64k'];
+const CONTEXTS = [...SHORT_CONTEXTS, ...LONG_CONTEXTS];
 
-const rawDir = path.join(reportsDir, 'raw');
-if (!fs.existsSync(rawDir)) {
-  fs.mkdirSync(rawDir, { recursive: true });
-}
-
-function loadScenarioData(profile) {
-  const results = {};
-  for (const sc of SCENARIO_DEFS) {
-    let jsonPath = path.join(rawDir, `${sc.id}_${profile}_summary.json`);
-    if (!fs.existsSync(jsonPath)) {
-      jsonPath = path.join(reportsDir, `${sc.id}_${profile}_summary.json`);
-    }
-    if (fs.existsSync(jsonPath)) {
-      try {
-        const raw = fs.readFileSync(jsonPath, 'utf8');
-        results[sc.id] = JSON.parse(raw);
-      } catch (err) {
-        console.warn(`[WARN] Gagal membaca ${jsonPath}:`, err.message);
-      }
-    }
+const SCENARIOS = [];
+for (const ctx of CONTEXTS) {
+  for (const thinking of [true, false]) {
+    SCENARIOS.push({
+      id: `think_${thinking ? 'on' : 'off'}_${ctx}`,
+      name: `Thinking ${thinking ? 'ON' : 'OFF'} + ${LONG_CONTEXTS.includes(ctx) ? 'Long' : 'Short'} Context (${ctx})`,
+      thinking,
+      context: ctx,
+      category: LONG_CONTEXTS.includes(ctx) ? 'Long' : 'Short',
+    });
   }
-  return results;
 }
 
-function extractMetrics(scenarioSummary) {
-  if (!scenarioSummary || !scenarioSummary.metrics) return null;
-  const m = scenarioSummary.metrics;
+const SERVERS = {
+  runpod: { key: 'runpod', label: 'Runpod (RTX A6000 Ada)', title: 'Runpod — NVIDIA RTX A6000 Ada (48GB GDDR6)', url: runpodUrl },
+  dgx: { key: 'dgx', label: 'Server DGX', title: 'Server DGX — High-VRAM HBM Architecture', url: dgxUrl },
+};
 
-  const getVal = (metricObj, key, fallback = 0) => {
-    if (metricObj && metricObj.values && metricObj.values[key] !== undefined) {
-      return metricObj.values[key];
-    }
-    return fallback;
-  };
+const PASS_THRESHOLD = 95; // % success rate (final, setelah retry)
 
-  const ttftAvg = getVal(m.llm_ttft_ms, 'avg');
-  const ttftP90 = getVal(m.llm_ttft_ms, 'p(90)');
-  const tpsAvg = getVal(m.llm_tokens_per_second, 'avg');
-  const tpsMax = getVal(m.llm_tokens_per_second, 'max');
-  const oomRate = getVal(m.llm_oom_failures, 'rate') * 100;
-  const successRate = getVal(m.llm_success_rate, 'rate', 1) * 100;
-  const completionTokens = getVal(m.llm_completion_tokens, 'count');
-  const promptTokens = getVal(m.llm_prompt_tokens, 'count');
-  const totalTokens = getVal(m.llm_total_tokens, 'count') || (completionTokens + promptTokens);
-  const iterations = getVal(m.iterations, 'count');
-  const maxVUs = getVal(m.vus_max, 'value') || getVal(m.vus, 'max') || 0;
+// ---------- Pemuatan & ekstraksi data ----------
+function loadSummary(id, profile) {
+  const p = path.join(rawDir, `${id}_${profile}_summary.json`);
+  if (!fs.existsSync(p)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (err) {
+    console.warn(`[WARN] Gagal membaca ${p}: ${err.message}`);
+    return null;
+  }
+}
+
+function loadAll(profile) {
+  const out = {};
+  for (const sc of SCENARIOS) out[sc.id] = extractMetrics(loadSummary(sc.id, profile));
+  return out;
+}
+
+function extractMetrics(summary) {
+  if (!summary || !summary.metrics) return null;
+  const m = summary.metrics;
+  const v = (name, key, fb = 0) => (m[name] && m[name].values && m[name].values[key] !== undefined ? m[name].values[key] : fb);
+
+  const passes = v('llm_success_rate', 'passes');
+  const fails = v('llm_success_rate', 'fails');
+  const requests = passes + fails;
+  const successRate = requests > 0 ? (passes / requests) * 100 : 0;
 
   return {
-    ttftAvg: ttftAvg ? ttftAvg.toFixed(0) : '-',
-    ttftP90: ttftP90 ? ttftP90.toFixed(0) : '-',
-    tpsAvg: tpsAvg ? tpsAvg.toFixed(1) : '-',
-    tpsMax: tpsMax ? tpsMax.toFixed(1) : '-',
-    oomRate: oomRate.toFixed(1),
-    successRate: successRate.toFixed(1),
-    completionTokens: completionTokens.toLocaleString(),
-    promptTokens: promptTokens.toLocaleString(),
-    totalTokens: totalTokens.toLocaleString(),
-    iterations,
-    maxVUs,
-    passed: successRate >= 95 && oomRate < 5,
+    requests,
+    passes,
+    fails,
+    successRate,
+    ttftAvg: v('llm_ttft_ms', 'avg', null),
+    ttftP90: v('llm_ttft_ms', 'p(90)', null),
+    ttftP95: v('llm_ttft_ms', 'p(95)', null),
+    tpsAvg: v('llm_tokens_per_second', 'avg', null),
+    tpsMed: v('llm_tokens_per_second', 'med', null),
+    tpsMax: v('llm_tokens_per_second', 'max', null),
+    e2eAvg: v('llm_e2e_duration_ms', 'avg', null),
+    e2eP95: v('llm_e2e_duration_ms', 'p(95)', null),
+    promptTokens: v('llm_prompt_tokens', 'count'),
+    completionTokens: v('llm_completion_tokens', 'count'),
+    totalTokens: v('llm_total_tokens', 'count'),
+    retries: v('llm_retries', 'count'),
+    failOom: v('llm_fail_oom_5xx', 'count'),
+    failTimeout: v('llm_fail_timeout', 'count'),
+    fail429: v('llm_fail_429', 'count'),
+    fail4xx: v('llm_fail_4xx', 'count'),
+    iterations: v('iterations', 'count'),
+    maxVUs: v('vus_max', 'value') || v('vus', 'max'),
+    status: requests > 0 && successRate >= PASS_THRESHOLD ? 'PASSED' : 'FAILED',
+    raw: m,
   };
 }
 
-function generateSingleServerHTML(profile, data) {
-  const isRunpod = profile.toLowerCase().includes('runpod') || profile.toLowerCase().includes('a6000');
-  const serverTitle = isRunpod 
-    ? 'Runpod — NVIDIA RTX A6000 Ada (48GB GDDR6)' 
-    : 'Server DGX — High-VRAM HBM Architecture';
-  const serverBadge = isRunpod ? 'Runpod (A6000 Ada)' : 'Server DGX';
-  const badgeColor = isRunpod ? '#f59e0b' : '#3b82f6';
-  const activeEndpoint = isRunpod ? runpodUrl : dgxUrl;
+// ---------- Helper format ----------
+const fmt = (n, d = 0) => (n === null || n === undefined || Number.isNaN(n) ? '-' : Number(n).toFixed(d));
+const fmtSec = (ms) => (ms === null || ms === undefined ? '-' : `${(ms / 1000).toFixed(2)} s`);
+const fmtInt = (n) => (n === null || n === undefined ? '-' : Math.round(n).toLocaleString('id-ID'));
+const failedAttempts = (x) => x.failOom + x.failTimeout + x.fail429 + x.fail4xx;
 
-  let tableRows = '';
-  let totalReqs = 0;
-  let allPassed = true;
-  let completedCount = 0;
-
-  for (const sc of SCENARIO_DEFS) {
-    const raw = data[sc.id];
-    const metrics = extractMetrics(raw);
-
-    if (metrics) {
-      completedCount++;
-      totalReqs += metrics.iterations;
-      if (!metrics.passed) allPassed = false;
-
-      const statusBadge = metrics.passed
-        ? `<span class="badge badge-success">PASSED</span>`
-        : `<span class="badge badge-danger">FAILED (OOM / Degraded)</span>`;
-
-      tableRows += `
-        <tr>
-          <td>
-            <strong>${sc.name}</strong>
-            <div class="text-muted small">Thinking: ${sc.thinking ? 'ON' : 'OFF'} | Context: ${sc.context}</div>
-          </td>
-          <td>${statusBadge}</td>
-          <td>${metrics.ttftAvg} ms <span class="text-muted small">(p90: ${metrics.ttftP90} ms)</span></td>
-          <td><strong>${metrics.tpsAvg}</strong> <span class="text-muted small">tps (peak: ${metrics.tpsMax})</span></td>
-          <td>${metrics.maxVUs} VUs</td>
-          <td><span class="${metrics.oomRate > 0 ? 'text-danger font-bold' : 'text-success'}">${metrics.oomRate}%</span></td>
-          <td>${metrics.successRate}%</td>
-          <td>${metrics.iterations}</td>
-        </tr>
-      `;
-    } else {
-      tableRows += `
-        <tr class="opacity-60">
-          <td>
-            <strong>${sc.name}</strong>
-            <div class="text-muted small">Thinking: ${sc.thinking ? 'ON' : 'OFF'} | Context: ${sc.context}</div>
-          </td>
-          <td><span class="badge badge-neutral">MENUNGGU TES</span></td>
-          <td colspan="6" class="text-muted italic">Skenario ini belum dijalankan. Jalankan: <code>./run_benchmark.sh ${sc.id.slice(0, 2).replace(/^0+/, '')} ${profile}</code></td>
-        </tr>
-      `;
-    }
-  }
-
-  return `<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Laporan Uji Beban LLM - ${serverBadge}</title>
-  <style>
-    :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --border: #334155;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --accent: ${badgeColor};
-      --success: #10b981;
-      --danger: #ef4444;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      padding: 32px 20px;
-      line-height: 1.5;
-    }
-    .container { max-width: 1200px; margin: 0 auto; }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 24px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 32px;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-    .header h1 { font-size: 26px; font-weight: 700; color: #fff; }
-    .header p { color: var(--muted); font-size: 14px; margin-top: 4px; }
-    .server-pill {
-      background: var(--accent);
-      color: #fff;
-      padding: 8px 18px;
-      border-radius: 9999px;
-      font-weight: 600;
-      font-size: 14px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-    }
-    .endpoint-badge {
-      display: inline-block;
-      margin-top: 8px;
-      background: rgba(255,255,255,0.06);
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-family: monospace;
-      font-size: 12px;
-      color: #38bdf8;
-      border: 1px solid rgba(56, 189, 248, 0.2);
-    }
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 16px;
-      margin-bottom: 32px;
-    }
-    .stat-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-    }
-    .stat-label { font-size: 13px; color: var(--muted); text-transform: uppercase; font-weight: 600; }
-    .stat-value { font-size: 28px; font-weight: 700; margin: 8px 0; color: #fff; }
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 32px;
-      overflow-x: auto;
-    }
-    .card-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #fff; display: flex; align-items: center; justify-content: space-between; }
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
-    th { padding: 12px 14px; background: rgba(0,0,0,0.25); color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
-    td { padding: 14px; border-bottom: 1px solid var(--border); }
-    tr:last-child td { border-bottom: none; }
-    .badge {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    .badge-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-    .badge-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
-    .badge-neutral { background: rgba(148, 163, 184, 0.15); color: var(--muted); border: 1px solid rgba(148, 163, 184, 0.3); }
-    .text-muted { color: var(--muted); }
-    .small { font-size: 12px; }
-    .text-success { color: #34d399; }
-    .text-danger { color: #f87171; }
-    .font-bold { font-weight: 700; }
-    .italic { font-style: italic; }
-    .opacity-60 { opacity: 0.6; }
-    code { font-family: monospace; color: #38bdf8; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; }
-    .footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 40px; }
-    .nav-links { display: flex; gap: 12px; margin-bottom: 24px; }
-    .nav-btn {
-      text-decoration: none;
-      color: #94a3b8;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--border);
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-    .nav-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
-    .nav-btn.active { color: #fff; background: var(--accent); border-color: var(--accent); }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="nav-links">
-      <a href="report_runpod.html" class="nav-btn ${isRunpod ? 'active' : ''}">Laporan Runpod</a>
-      <a href="report_dgx.html" class="nav-btn ${!isRunpod ? 'active' : ''}">Laporan DGX</a>
-      <a href="report_comparison_dgx_vs_runpod.html" class="nav-btn">Laporan Head-to-Head</a>
-    </div>
-
-    <div class="header">
-      <div>
-        <h1>Laporan Komprehensif Uji Beban LLM (K6)</h1>
-        <p>Model Target: <strong>${modelName}</strong> | Arsitektur: ${serverTitle}</p>
-        <div class="endpoint-badge">Target Endpoint: ${activeEndpoint}</div>
-      </div>
-      <div class="server-pill">${serverBadge}</div>
-    </div>
-
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Skenario Selesai</div>
-        <div class="stat-value">${completedCount} / 4</div>
-        <div class="text-muted small">Cakupan pengujian inferensi</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Total Permintaan (Requests)</div>
-        <div class="stat-value">${totalReqs.toLocaleString()}</div>
-        <div class="text-muted small">Akumulasi request pada server</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Status SLA & Kestabilan</div>
-        <div class="stat-value" style="color: ${completedCount === 0 ? '#94a3b8' : (allPassed ? '#34d399' : '#f87171')}">
-          ${completedCount === 0 ? 'MENUNGGU TES' : (allPassed ? 'STABIL' : 'TERDETEKSI OOM')}
-        </div>
-        <div class="text-muted small">${completedCount === 0 ? 'Belum ada eksekusi K6' : (allPassed ? 'Toleransi OOM di bawah 5%' : 'Terjadi degradasi / 500 error')}</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">
-        <span>Matriks Hasil 4 Skenario Inferensi</span>
-        <span class="text-muted small">Di-generate otomatis oleh K6 LLM Suite</span>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Skenario</th>
-            <th>Status SLA</th>
-            <th>TTFT (Waktu Token 1)</th>
-            <th>Generation Speed</th>
-            <th>Max VUs</th>
-            <th>OOM / 500 Error</th>
-            <th>Success Rate</th>
-            <th>Total Req</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tableRows}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="footer">
-      Generated on ${new Date().toLocaleString('id-ID')} &bull; K6 LLM Stress Test Framework
-    </div>
-  </div>
-</body>
-</html>
-`;
+function statusBadge(x) {
+  if (!x) return '<span class="badge badge-neutral">NOT RUN</span>';
+  return x.status === 'PASSED'
+    ? '<span class="badge badge-success">PASSED</span>'
+    : '<span class="badge badge-danger">FAILED</span>';
 }
 
-function generateHeadToHeadHTML(runpodData, dgxData) {
-  let rows = '';
-  let runpodTested = 0;
-  let dgxTested = 0;
+function causeText(x) {
+  const parts = [];
+  if (x.failOom) parts.push(`OOM/5xx ${x.failOom}`);
+  if (x.failTimeout) parts.push(`timeout ${x.failTimeout}`);
+  if (x.fail429) parts.push(`429 ${x.fail429}`);
+  if (x.fail4xx) parts.push(`4xx ${x.fail4xx}`);
+  return parts.length ? parts.join(', ') : '-';
+}
 
-  for (const sc of SCENARIO_DEFS) {
-    const rMetrics = extractMetrics(runpodData[sc.id]);
-    const dMetrics = extractMetrics(dgxData[sc.id]);
-
-    if (rMetrics) runpodTested++;
-    if (dMetrics) dgxTested++;
-
-    const rStatus = rMetrics ? (rMetrics.passed ? '<span class="badge badge-success">OK</span>' : '<span class="badge badge-danger">OOM / Fail</span>') : '<span class="badge badge-neutral">Belum Diuji</span>';
-    const dStatus = dMetrics ? (dMetrics.passed ? '<span class="badge badge-success">OK</span>' : '<span class="badge badge-danger">OOM / Fail</span>') : '<span class="badge badge-neutral">Belum Diuji</span>';
-
-    rows += `
-      <tr>
-        <td>
-          <strong>${sc.name}</strong>
-          <div class="text-muted small">Thinking: ${sc.thinking ? 'ON' : 'OFF'} | Context: ${sc.context}</div>
-        </td>
-        <td>${rStatus}</td>
-        <td><strong>${rMetrics ? rMetrics.tpsAvg : '-'}</strong> tps</td>
-        <td>${rMetrics ? rMetrics.ttftAvg : '-'} ms</td>
-        <td>${rMetrics ? (rMetrics.oomRate > 0 ? '<span class="text-danger font-bold">' + rMetrics.oomRate + '%</span>' : rMetrics.oomRate + '%') : '-'}</td>
-        <td style="border-left: 2px solid #334155;">${dStatus}</td>
-        <td><strong class="text-success">${dMetrics ? dMetrics.tpsAvg : '-'}</strong> tps</td>
-        <td class="text-success">${dMetrics ? dMetrics.ttftAvg : '-'} ms</td>
-        <td>${dMetrics ? dMetrics.oomRate + '%' : '-'}</td>
-      </tr>
-    `;
-  }
-
-  return `<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Benchmark Head-to-Head: Server DGX vs Runpod (A6000)</title>
-  <style>
-    :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --border: #334155;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --runpod: #f59e0b;
-      --dgx: #3b82f6;
-      --success: #10b981;
-      --danger: #ef4444;
-    }
+// ---------- Kerangka HTML (tema seragam) ----------
+const CSS = `
+    :root { --bg:#0f172a; --card-bg:#1e293b; --border:#334155; --text:#f8fafc; --muted:#94a3b8; --runpod:#f59e0b; --dgx:#3b82f6; --success:#10b981; --danger:#ef4444; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      padding: 32px 20px;
-      line-height: 1.5;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 32px 20px; line-height: 1.5; }
     .container { max-width: 1300px; margin: 0 auto; }
-    .nav-links { display: flex; gap: 12px; margin-bottom: 24px; }
-    .nav-btn {
-      text-decoration: none;
-      color: #94a3b8;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--border);
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
+    .nav-links { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    .nav-btn { text-decoration: none; color: #94a3b8; background: rgba(255,255,255,0.05); border: 1px solid var(--border); padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; transition: all 0.2s; }
     .nav-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
     .nav-btn.active { color: #fff; background: #6366f1; border-color: #6366f1; }
-    .header {
-      padding-bottom: 24px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 32px;
-      text-align: center;
-    }
+    .header { padding-bottom: 24px; border-bottom: 1px solid var(--border); margin-bottom: 32px; text-align: center; }
     .header h1 { font-size: 28px; margin-bottom: 8px; color: #fff; font-weight: 700; }
     .header p { color: var(--muted); font-size: 15px; }
-    .endpoints-container {
-      display: flex;
-      justify-content: center;
-      gap: 20px;
-      margin-top: 16px;
-      flex-wrap: wrap;
-    }
-    .endpoint-card {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-    }
+    .endpoints-container { display: flex; justify-content: center; gap: 20px; margin-top: 16px; flex-wrap: wrap; }
+    .endpoint-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; font-size: 13px; }
     .endpoint-card strong { color: #fff; }
     .endpoint-card code { font-family: monospace; color: #38bdf8; }
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 32px;
-      overflow-x: auto;
-    }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 32px; overflow-x: auto; }
     .card-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #fff; }
     table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
     th { padding: 12px 14px; background: rgba(0,0,0,0.3); color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
     td { padding: 14px; border-bottom: 1px solid var(--border); }
     .badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
-    .badge-success { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-    .badge-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-    .badge-neutral { background: rgba(148, 163, 184, 0.15); color: var(--muted); }
+    .badge-success { background: rgba(16,185,129,0.15); color: #34d399; }
+    .badge-danger { background: rgba(239,68,68,0.15); color: #f87171; }
+    .badge-neutral { background: rgba(148,163,184,0.15); color: var(--muted); }
     .text-success { color: #34d399; }
     .text-danger { color: #f87171; }
     .font-bold { font-weight: 700; }
     .text-muted { color: var(--muted); }
     .small { font-size: 12px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+    .stat { background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+    .stat .label { color: var(--muted); font-size: 12px; }
+    .stat .value { font-size: 22px; font-weight: 700; color: #fff; }
+    .conclusion ul { padding-left: 20px; }
+    .conclusion li { margin-bottom: 10px; font-size: 14px; }
+    .conclusion .verdict { margin-top: 16px; padding: 14px 16px; border-radius: 10px; background: rgba(99,102,241,0.12); border: 1px solid #6366f1; font-size: 14px; }
     .footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 40px; }
-  </style>
+`;
+
+function page({ title, heading, subtitle, active, body, endpoints = '' }) {
+  const nav = (href, label, key) => `<a href="${href}" class="nav-btn${active === key ? ' active' : ''}">${label}</a>`;
+  const prefix = active.startsWith('raw') ? '../' : '';
+  return `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <style>${CSS}</style>
 </head>
 <body>
   <div class="container">
     <div class="nav-links">
-      <a href="report_runpod.html" class="nav-btn">Laporan Runpod</a>
-      <a href="report_dgx.html" class="nav-btn">Laporan DGX</a>
-      <a href="report_comparison_dgx_vs_runpod.html" class="nav-btn active">Laporan Head-to-Head</a>
+      ${nav(prefix + 'report_runpod.html', 'Laporan Runpod', 'runpod')}
+      ${nav(prefix + 'report_dgx.html', 'Laporan DGX', 'dgx')}
+      ${nav(prefix + 'report_comparison_dgx_vs_runpod.html', 'Laporan Head-to-Head', 'compare')}
     </div>
-
     <div class="header">
-      <h1>Hasil Evaluasi Head-to-Head: Server DGX vs Runpod (RTX A6000 Ada)</h1>
-      <p>Benchmark Kapasitas Inferensi & Batas KV-Cache Model <strong>${modelName}</strong></p>
-      <div class="endpoints-container">
-        <div class="endpoint-card">
-          <strong style="color: #fbbf24;">Runpod URL:</strong> <code>${runpodUrl}</code>
-        </div>
-        <div class="endpoint-card">
-          <strong style="color: #60a5fa;">DGX URL:</strong> <code>${dgxUrl}</code>
-        </div>
+      <h1>${heading}</h1>
+      <p>${subtitle}</p>
+      ${endpoints}
+    </div>
+    ${body}
+    <div class="footer">Generated on ${new Date().toLocaleString('id-ID')} &bull; K6 LLM Stress Test Framework</div>
+  </div>
+</body>
+</html>`;
+}
+
+function conclusionCard(bullets, verdict) {
+  return `
+    <div class="card conclusion">
+      <div class="card-title">Kesimpulan</div>
+      <ul>${bullets.map((b) => `<li>${b}</li>`).join('')}</ul>
+      <div class="verdict"><strong>Rekomendasi:</strong> ${verdict}</div>
+    </div>`;
+}
+
+// ---------- Analisis untuk kesimpulan ----------
+function maxPassedContext(results, thinking) {
+  let best = null;
+  for (const sc of SCENARIOS) {
+    const x = results[sc.id];
+    if (sc.thinking === thinking && x && x.status === 'PASSED') best = sc.context;
+  }
+  return best;
+}
+
+function totals(results) {
+  const t = { run: 0, passed: 0, failed: 0, retries: 0, oom: 0, timeout: 0, r429: 0, c4xx: 0, requests: 0, failedReq: 0 };
+  for (const sc of SCENARIOS) {
+    const x = results[sc.id];
+    if (!x) continue;
+    t.run++;
+    x.status === 'PASSED' ? t.passed++ : t.failed++;
+    t.retries += x.retries;
+    t.oom += x.failOom;
+    t.timeout += x.failTimeout;
+    t.r429 += x.fail429;
+    t.c4xx += x.fail4xx;
+    t.requests += x.requests;
+    t.failedReq += x.fails;
+  }
+  return t;
+}
+
+function firstFailure(results, thinking) {
+  for (const sc of SCENARIOS) {
+    const x = results[sc.id];
+    if (sc.thinking === thinking && x && x.status === 'FAILED') return sc.context;
+  }
+  return null;
+}
+
+function serverConclusion(server, results) {
+  const t = totals(results);
+  if (t.run === 0) {
+    return conclusionCard(['Belum ada data pengujian untuk server ini.'], 'Jalankan skenario terlebih dahulu.');
+  }
+  const bullets = [];
+  bullets.push(`Dari <strong>${t.run}</strong> skenario yang dijalankan (maks ${SCENARIOS.length}), <strong class="text-success">${t.passed} PASSED</strong> dan <strong class="text-danger">${t.failed} FAILED</strong> (batas lulus: success rate final ≥ ${PASS_THRESHOLD}% setelah maksimal 3x retry).`);
+
+  for (const thinking of [true, false]) {
+    const best = maxPassedContext(results, thinking);
+    const fail = firstFailure(results, thinking);
+    const label = thinking ? 'Thinking ON' : 'Thinking OFF';
+    bullets.push(
+      `${label}: konteks terbesar yang lulus <strong>${best || 'tidak ada'}</strong>` +
+        (fail ? `; kegagalan pertama muncul di konteks <strong>${fail}</strong>.` : '; tidak ada kegagalan.')
+    );
+  }
+
+  const withTps = SCENARIOS.map((s) => results[s.id]).filter((x) => x && x.tpsAvg);
+  if (withTps.length) {
+    const avgTps = withTps.reduce((s, x) => s + x.tpsAvg, 0) / withTps.length;
+    const avgTtft = withTps.filter((x) => x.ttftAvg).reduce((s, x, _, a) => s + x.ttftAvg / a.length, 0);
+    bullets.push(`Rata-rata kecepatan generasi <strong>${fmt(avgTps, 1)} tokens/detik</strong> per stream dengan TTFT rata-rata <strong>${fmtSec(avgTtft)}</strong> pada skenario yang berhasil.`);
+  }
+
+  bullets.push(
+    `Kegagalan (per percobaan): OOM/5xx <strong>${t.oom}</strong>, timeout <strong>${t.timeout}</strong>, 429 <strong>${t.r429}</strong>, 4xx lain <strong>${t.c4xx}</strong>. Total retry dilakukan: <strong>${t.retries}</strong>; request yang tetap gagal setelah retry: <strong>${t.failedReq}</strong> dari ${fmtInt(t.requests)}.`
+  );
+  if (t.c4xx > 0) bullets.push('Terdapat error 4xx (tidak di-retry) — kemungkinan konteks + output melebihi batas <code>max-model-len</code> server.');
+
+  const verdict =
+    t.failed === 0
+      ? `${server.label} stabil untuk seluruh skenario yang diuji pada beban hingga 100 VU.`
+      : `${server.label} belum stabil pada ${t.failed} skenario; batasi konteks/konkurensi sesuai konteks terbesar yang lulus di atas atau tambah kapasitas.`;
+  return conclusionCard(bullets, verdict);
+}
+
+function compareConclusion(rp, dg) {
+  const tr = totals(rp);
+  const td = totals(dg);
+  if (tr.run === 0 && td.run === 0) return conclusionCard(['Belum ada data pengujian.'], 'Jalankan skenario terlebih dahulu.');
+
+  const bullets = [];
+  bullets.push(`Runpod: <strong class="text-success">${tr.passed} PASSED</strong> / <strong class="text-danger">${tr.failed} FAILED</strong> dari ${tr.run} skenario. DGX: <strong class="text-success">${td.passed} PASSED</strong> / <strong class="text-danger">${td.failed} FAILED</strong> dari ${td.run} skenario.`);
+
+  for (const thinking of [true, false]) {
+    const label = thinking ? 'Thinking ON' : 'Thinking OFF';
+    bullets.push(`${label} — konteks terbesar yang lulus: Runpod <strong>${maxPassedContext(rp, thinking) || 'tidak ada'}</strong>, DGX <strong>${maxPassedContext(dg, thinking) || 'tidak ada'}</strong>.`);
+  }
+
+  // Head-to-head pada skenario yang berhasil di kedua server
+  const both = SCENARIOS.filter((s) => rp[s.id] && dg[s.id] && rp[s.id].tpsAvg && dg[s.id].tpsAvg);
+  if (both.length) {
+    const avg = (arr, f) => arr.reduce((s, x) => s + f(x), 0) / arr.length;
+    const rTps = avg(both, (s) => rp[s.id].tpsAvg);
+    const dTps = avg(both, (s) => dg[s.id].tpsAvg);
+    const rTtft = avg(both.filter((s) => rp[s.id].ttftAvg && dg[s.id].ttftAvg), (s) => rp[s.id].ttftAvg);
+    const dTtft = avg(both.filter((s) => rp[s.id].ttftAvg && dg[s.id].ttftAvg), (s) => dg[s.id].ttftAvg);
+    const tpsWin = dTps > rTps ? 'DGX' : 'Runpod';
+    const ttftWin = dTtft < rTtft ? 'DGX' : 'Runpod';
+    bullets.push(`Pada ${both.length} skenario yang berhasil di kedua server: TPS rata-rata Runpod <strong>${fmt(rTps, 1)}</strong> vs DGX <strong>${fmt(dTps, 1)}</strong> (lebih cepat: <strong>${tpsWin}</strong>); TTFT rata-rata Runpod <strong>${fmtSec(rTtft)}</strong> vs DGX <strong>${fmtSec(dTtft)}</strong> (lebih rendah: <strong>${ttftWin}</strong>).`);
+  } else {
+    bullets.push('Tidak ada skenario yang berhasil di kedua server, sehingga perbandingan TPS/TTFT belum dapat dibuat.');
+  }
+
+  bullets.push(`Penyebab kegagalan — Runpod: OOM/5xx ${tr.oom}, timeout ${tr.timeout}, 429 ${tr.r429}, 4xx ${tr.c4xx}, retry ${tr.retries}. DGX: OOM/5xx ${td.oom}, timeout ${td.timeout}, 429 ${td.r429}, 4xx ${td.c4xx}, retry ${td.retries}.`);
+
+  let verdict;
+  if (td.run && tr.run) {
+    if (td.passed > tr.passed) verdict = `DGX lebih layak untuk beban produksi (lulus ${td.passed} vs ${tr.passed} skenario). Runpod hanya cocok untuk konteks/konkurensi yang lebih rendah sesuai batas lulus di atas.`;
+    else if (tr.passed > td.passed) verdict = `Runpod lulus lebih banyak skenario (${tr.passed} vs ${td.passed}); periksa konfigurasi DGX (batas memori/antrean) sebelum dijadikan acuan.`;
+    else verdict = `Kedua server lulus jumlah skenario yang sama (${tr.passed}); pilih berdasarkan TPS/TTFT dan biaya.`;
+  } else {
+    verdict = 'Data salah satu server belum lengkap; jalankan seluruh skenario di kedua server untuk kesimpulan akhir.';
+  }
+  return conclusionCard(bullets, verdict);
+}
+
+// ---------- Laporan per skenario (raw) ----------
+function trendRow(label, metric, unit, scale = 1) {
+  if (!metric || !metric.values) return '';
+  const g = (k) => (metric.values[k] === undefined ? '-' : fmt(metric.values[k] / scale, 2));
+  return `<tr><td>${label}</td><td>${g('avg')}</td><td>${g('min')}</td><td>${g('med')}</td><td>${g('p(90)')}</td><td>${g('p(95)')}</td><td>${g('max')}</td><td class="text-muted">${unit}</td></tr>`;
+}
+
+function scenarioReport(sc, profile, x) {
+  const server = SERVERS[profile];
+  const m = x.raw;
+  const body = `
+    <div class="card">
+      <div class="card-title">Ringkasan</div>
+      <div class="stats">
+        <div class="stat"><div class="label">Status</div><div class="value">${statusBadge(x)}</div></div>
+        <div class="stat"><div class="label">Success rate (final)</div><div class="value ${x.status === 'PASSED' ? 'text-success' : 'text-danger'}">${fmt(x.successRate, 1)}%</div></div>
+        <div class="stat"><div class="label">Total request</div><div class="value">${fmtInt(x.requests)}</div></div>
+        <div class="stat"><div class="label">Request gagal (setelah 3x retry)</div><div class="value">${fmtInt(x.fails)}</div></div>
+        <div class="stat"><div class="label">Total retry</div><div class="value">${fmtInt(x.retries)}</div></div>
+        <div class="stat"><div class="label">VU maksimum</div><div class="value">${x.maxVUs}</div></div>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title">1. Matriks Hasil Aktual Pengujian Beban (K6)</div>
+      <div class="card-title">Latensi &amp; Kecepatan</div>
+      <table>
+        <thead><tr><th>Metrik</th><th>avg</th><th>min</th><th>med</th><th>p(90)</th><th>p(95)</th><th>max</th><th>Satuan</th></tr></thead>
+        <tbody>
+          ${trendRow('Time-To-First-Token (TTFT)', m.llm_ttft_ms, 's', 1000)}
+          ${trendRow('Tokens per detik (per stream)', m.llm_tokens_per_second, 'tps')}
+          ${trendRow('Durasi E2E', m.llm_e2e_duration_ms, 's', 1000)}
+          ${trendRow('HTTP request duration', m.http_req_duration, 's', 1000)}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Kegagalan &amp; Retry</div>
+      <table>
+        <thead><tr><th>Penyebab (per percobaan)</th><th>Jumlah</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <tr><td>OOM / HTTP 5xx</td><td>${x.failOom}</td><td class="text-muted small">Di-retry hingga 3x</td></tr>
+          <tr><td>Timeout / koneksi terputus</td><td>${x.failTimeout}</td><td class="text-muted small">Di-retry hingga 3x</td></tr>
+          <tr><td>HTTP 429</td><td>${x.fail429}</td><td class="text-muted small">Di-retry hingga 3x</td></tr>
+          <tr><td>HTTP 4xx lain</td><td>${x.fail4xx}</td><td class="text-muted small">Tidak di-retry (mis. konteks melebihi batas)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Token</div>
+      <div class="stats">
+        <div class="stat"><div class="label">Prompt tokens</div><div class="value">${fmtInt(x.promptTokens)}</div></div>
+        <div class="stat"><div class="label">Completion tokens</div><div class="value">${fmtInt(x.completionTokens)}</div></div>
+        <div class="stat"><div class="label">Total tokens</div><div class="value">${fmtInt(x.totalTokens)}</div></div>
+      </div>
+    </div>`;
+
+  const bullets = [];
+  if (x.status === 'PASSED') {
+    bullets.push(`Skenario <strong class="text-success">PASSED</strong>: success rate ${fmt(x.successRate, 1)}% dari ${fmtInt(x.requests)} request, TPS rata-rata ${fmt(x.tpsAvg, 1)}, TTFT rata-rata ${fmtSec(x.ttftAvg)}.`);
+  } else {
+    bullets.push(`Skenario <strong class="text-danger">FAILED</strong>: success rate ${fmt(x.successRate, 1)}% (di bawah ${PASS_THRESHOLD}%); ${fmtInt(x.fails)} request tetap gagal setelah retry.`);
+  }
+  bullets.push(`Penyebab kegagalan: ${causeText(x)}. Total retry: ${x.retries}.`);
+  if (x.fail4xx > 0) bullets.push('Ada error 4xx — periksa batas <code>max-model-len</code> server terhadap ukuran prompt + output.');
+  const verdict =
+    x.status === 'PASSED'
+      ? `${server.label} mampu menangani ${sc.name} pada beban hingga ${x.maxVUs} VU.`
+      : `${server.label} tidak mampu menangani ${sc.name} pada beban hingga ${x.maxVUs} VU; turunkan konkurensi atau konteks.`;
+
+  return page({
+    title: `${sc.name} — ${server.label}`,
+    heading: sc.name,
+    subtitle: `${server.title} &bull; Model <strong>${modelName}</strong>`,
+    active: `raw-${profile}`,
+    body: body + conclusionCard(bullets, verdict),
+  });
+}
+
+// ---------- Laporan per server ----------
+function serverReport(profile, results) {
+  const server = SERVERS[profile];
+  let rows = '';
+  for (const sc of SCENARIOS) {
+    const x = results[sc.id];
+    const link = x ? `<a class="text-muted small" href="raw/${sc.id}_${profile}_report.html">detail</a>` : '';
+    rows += `
+        <tr>
+          <td><strong>${sc.name}</strong><div class="text-muted small">Thinking: ${sc.thinking ? 'ON' : 'OFF'} | Context: ${sc.context} ${link}</div></td>
+          <td>${statusBadge(x)}</td>
+          ${
+            x
+              ? `<td>${fmt(x.successRate, 1)}%</td>
+          <td>${fmtSec(x.ttftAvg)} <span class="text-muted small">(p90: ${fmtSec(x.ttftP90)})</span></td>
+          <td><strong>${fmt(x.tpsAvg, 1)}</strong> <span class="text-muted small">tps (peak: ${fmt(x.tpsMax, 1)})</span></td>
+          <td>${x.retries}</td>
+          <td class="small">${causeText(x)}</td>
+          <td>${x.maxVUs} VUs</td>`
+              : '<td colspan="6" class="text-muted">Belum diuji</td>'
+          }
+        </tr>`;
+  }
+  const body = `
+    <div class="card">
+      <div class="card-title">Hasil Pengujian Beban (K6) — Maks 100 VU</div>
+      <table>
+        <thead><tr><th>Skenario Uji</th><th>Status</th><th>Success</th><th>TTFT</th><th>TPS</th><th>Retry</th><th>Penyebab Gagal</th><th>Beban</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    ${serverConclusion(server, results)}`;
+
+  return page({
+    title: `Laporan ${server.label}`,
+    heading: `Laporan Pengujian: ${server.title}`,
+    subtitle: `Benchmark Kapasitas Inferensi Model <strong>${modelName}</strong>`,
+    active: profile,
+    endpoints: `<div class="endpoints-container"><div class="endpoint-card"><strong>URL:</strong> <code>${server.url}</code></div></div>`,
+    body,
+  });
+}
+
+// ---------- Laporan head-to-head ----------
+function compareReport(rp, dg) {
+  let rows = '';
+  const cell = (x, border = false) => {
+    const b = border ? ' style="border-left: 2px solid #334155;"' : '';
+    if (!x) return `<td${b}>${statusBadge(x)}</td><td>-</td><td>-</td><td>-</td><td>-</td>`;
+    return `<td${b}>${statusBadge(x)}</td><td>${fmt(x.tpsAvg, 1)}</td><td>${fmtSec(x.ttftAvg)}</td><td>${fmt(x.successRate, 1)}%</td><td>${x.retries}</td>`;
+  };
+  for (const sc of SCENARIOS) {
+    rows += `
+        <tr>
+          <td><strong>${sc.name}</strong><div class="text-muted small">Thinking: ${sc.thinking ? 'ON' : 'OFF'} | Context: ${sc.context}</div></td>
+          ${cell(rp[sc.id])}
+          ${cell(dg[sc.id], true)}
+        </tr>`;
+  }
+  const body = `
+    <div class="card">
+      <div class="card-title">1. Matriks Hasil Pengujian Beban (K6) — Profil Beban Sama, Maks 100 VU</div>
       <table>
         <thead>
           <tr>
             <th rowspan="2">Skenario Uji</th>
-            <th colspan="4" style="text-align: center; background: rgba(245, 158, 11, 0.15); color: #fbbf24;">RUNPOD (RTX A6000 Ada - 48GB GDDR6)</th>
-            <th colspan="4" style="text-align: center; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-left: 2px solid #334155;">SERVER DGX (High-VRAM HBM)</th>
+            <th colspan="5" style="text-align:center; background: rgba(245,158,11,0.15); color:#fbbf24;">RUNPOD (RTX A6000 Ada - 48GB GDDR6)</th>
+            <th colspan="5" style="text-align:center; background: rgba(59,130,246,0.15); color:#60a5fa; border-left: 2px solid #334155;">SERVER DGX (High-VRAM HBM)</th>
           </tr>
           <tr>
-            <th>Status</th>
-            <th>TPS</th>
-            <th>TTFT</th>
-            <th>OOM %</th>
-            <th style="border-left: 2px solid #334155;">Status</th>
-            <th>TPS</th>
-            <th>TTFT</th>
-            <th>OOM %</th>
+            <th>Status</th><th>TPS</th><th>TTFT</th><th>Success</th><th>Retry</th>
+            <th style="border-left: 2px solid #334155;">Status</th><th>TPS</th><th>TTFT</th><th>Success</th><th>Retry</th>
           </tr>
         </thead>
-        <tbody>
-          ${rows}
-        </tbody>
+        <tbody>${rows}</tbody>
       </table>
+      <div class="text-muted small" style="margin-top:12px;">Request OOM/overload (5xx, 429, timeout) di-retry hingga 3x; jika tetap gagal dinyatakan FAILED. Skenario PASSED bila success rate final ≥ ${PASS_THRESHOLD}%.</div>
     </div>
 
     <div class="card">
       <div class="card-title">2. Target Spesifikasi Benchmark PM (Referensi Evaluasi)</div>
       <table>
-        <thead>
-          <tr>
-            <th>Metrik Evaluasi</th>
-            <th style="color: #fbbf24;">Target Runpod (A6000 Ada)</th>
-            <th style="color: #60a5fa;">Target Server DGX</th>
-            <th>Cara Pengukuran K6</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Metrik Evaluasi</th><th style="color:#fbbf24;">Target Runpod (A6000 Ada)</th><th style="color:#60a5fa;">Target Server DGX</th><th>Cara Pengukuran K6</th></tr></thead>
         <tbody>
-          <tr>
-            <td><strong>VRAM Footprint & KV-Cache</strong></td>
-            <td>48 GB GDDR6 (~20–24 GB KV-Cache)</td>
-            <td>High VRAM HBM (~70–105 GB KV-Cache)</td>
-            <td>Pantau titik lonjakan OOM saat multi-user</td>
-          </tr>
-          <tr>
-            <td><strong>Peak Generation Speed</strong></td>
-            <td>~30 – 45 tokens/detik (Single User)</td>
-            <td>~150 – 170+ tokens/detik</td>
-            <td><code>llm_tokens_per_second</code> (Profile: 1 VU)</td>
-          </tr>
-          <tr>
-            <td><strong>Throughput Multi-User</strong></td>
-            <td>~15 – 25 tokens/detik per stream</td>
-            <td>~72 – 95+ tokens/detik per stream</td>
-            <td><code>llm_tokens_per_second</code> (Stress Profile)</td>
-          </tr>
-          <tr>
-            <td><strong>Time-to-First-Token (TTFT)</strong></td>
-            <td>Latensi tinggi (>3.5s pada long context)</td>
-            <td>Ultra-low latency (<0.8s – 1.2s)</td>
-            <td><code>llm_ttft_ms</code> via SSE stream TTFB</td>
-          </tr>
-          <tr>
-            <td><strong>Max Concurrent Users</strong></td>
-            <td>~4 – 8 loops (rentan OOM)</td>
-            <td>72+ highly concurrent agentic loops</td>
-            <td><code>llm_oom_failures</code> pada Ramping VUs</td>
-          </tr>
-          <tr>
-            <td><strong>Max Context Window</strong></td>
-            <td>Terbatas (~16K – 32K di bawah beban)</td>
-            <td>Full context (128K tokens)</td>
-            <td>Payload <code>data/long_context_128k.json</code></td>
-          </tr>
+          <tr><td><strong>VRAM Footprint &amp; KV-Cache</strong></td><td>48 GB GDDR6 (~20–24 GB KV-Cache)</td><td>High VRAM HBM (~70–105 GB KV-Cache)</td><td>Pantau titik lonjakan OOM saat multi-user</td></tr>
+          <tr><td><strong>Peak Generation Speed</strong></td><td>~30 – 45 tokens/detik (Single User)</td><td>~150 – 170+ tokens/detik</td><td><code>llm_tokens_per_second</code></td></tr>
+          <tr><td><strong>Time-to-First-Token (TTFT)</strong></td><td>Latensi tinggi (&gt;3.5s pada long context)</td><td>Ultra-low latency (&lt;0.8s – 1.2s)</td><td><code>llm_ttft_ms</code></td></tr>
+          <tr><td><strong>Max Concurrent Users</strong></td><td>~4 – 8 loops (rentan OOM)</td><td>72+ concurrent agentic loops</td><td>Ramping VUs 1 → 100, rincian <code>llm_fail_*</code></td></tr>
+          <tr><td><strong>Max Context Window</strong></td><td>Hingga 64K</td><td>Hingga 64K</td><td>Payload <code>data/context_{1k..64k}.json</code></td></tr>
         </tbody>
       </table>
     </div>
+    ${compareConclusion(rp, dg)}`;
 
-    <div class="footer">
-      Generated on ${new Date().toLocaleString('id-ID')} &bull; K6 LLM Stress Test Framework
-    </div>
-  </div>
-</body>
-</html>
-`;
+  return page({
+    title: 'Benchmark Head-to-Head: Server DGX vs Runpod (A6000)',
+    heading: 'Hasil Evaluasi Head-to-Head: Server DGX vs Runpod (RTX A6000 Ada)',
+    subtitle: `Benchmark Kapasitas Inferensi &amp; Batas KV-Cache Model <strong>${modelName}</strong> (konteks 1k – 64k)`,
+    active: 'compare',
+    endpoints: `<div class="endpoints-container">
+        <div class="endpoint-card"><strong style="color:#fbbf24;">Runpod URL:</strong> <code>${runpodUrl}</code></div>
+        <div class="endpoint-card"><strong style="color:#60a5fa;">DGX URL:</strong> <code>${dgxUrl}</code></div>
+      </div>`,
+    body,
+  });
 }
 
-// Selalu generate seluruh laporan: Runpod, DGX, dan Head-to-Head
-['runpod', 'dgx'].forEach(prof => {
-  const data = loadScenarioData(prof);
-  const html = generateSingleServerHTML(prof, data);
-  const outPath = path.join(reportsDir, `report_${prof}.html`);
-  fs.writeFileSync(outPath, html, 'utf8');
-  console.log(`[OK] Laporan server berhasil dibuat: ${outPath}`);
-});
+// ---------- Eksekusi ----------
+const data = { runpod: loadAll('runpod'), dgx: loadAll('dgx') };
 
-// Selalu buat laporan perbandingan Head-to-Head
-const runpodData = loadScenarioData('runpod');
-const dgxData = loadScenarioData('dgx');
-const compHtml = generateHeadToHeadHTML(runpodData, dgxData);
+for (const profile of ['runpod', 'dgx']) {
+  for (const sc of SCENARIOS) {
+    const x = data[profile][sc.id];
+    if (!x) continue;
+    fs.writeFileSync(path.join(rawDir, `${sc.id}_${profile}_report.html`), scenarioReport(sc, profile, x), 'utf8');
+  }
+  const out = path.join(reportsDir, `report_${profile}.html`);
+  fs.writeFileSync(out, serverReport(profile, data[profile]), 'utf8');
+  console.log(`[OK] Laporan server berhasil dibuat: ${out}`);
+}
+
 const compPath = path.join(reportsDir, 'report_comparison_dgx_vs_runpod.html');
-fs.writeFileSync(compPath, compHtml, 'utf8');
+fs.writeFileSync(compPath, compareReport(data.runpod, data.dgx), 'utf8');
 console.log(`[OK] Laporan perbandingan Head-to-Head berhasil dibuat: ${compPath}`);
