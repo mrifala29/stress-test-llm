@@ -53,21 +53,21 @@ export function getEstimatedActiveVUs(elapsedSec, profile = 'standard') {
     if (elapsedSec < 60) return 2;
     return 1;
   }
-  // Profil beban standard (1 -> 100 VU):
-  // 0s - 60s: 1 VU
-  // 60s - 180s: ramp 1 -> 10 VU
-  // 180s - 300s: ramp 10 -> 25 VU
-  // 300s - 420s: ramp 25 -> 50 VU
-  // 420s - 540s: ramp 50 -> 75 VU
-  // 540s - 660s: ramp 75 -> 100 VU
-  // 660s - 720s: cooldown 100 -> 0 VU
-  if (elapsedSec < 60) return 1;
-  if (elapsedSec < 180) return Math.round(1 + ((elapsedSec - 60) / 120) * 9);
-  if (elapsedSec < 300) return Math.round(10 + ((elapsedSec - 180) / 120) * 15);
-  if (elapsedSec < 420) return Math.round(25 + ((elapsedSec - 300) / 120) * 25);
-  if (elapsedSec < 540) return Math.round(50 + ((elapsedSec - 420) / 120) * 25);
-  if (elapsedSec < 660) return Math.round(75 + ((elapsedSec - 540) / 120) * 25);
-  return 100;
+  // Profil beban standard (1 -> 1000 VU, total 20 menit / 1200 detik):
+  // 0s - 120s  (2m): ramp 1 -> 50 VU
+  // 120s - 300s (3m): ramp 50 -> 100 VU
+  // 300s - 480s (3m): ramp 100 -> 250 VU
+  // 480s - 720s (4m): ramp 250 -> 500 VU
+  // 720s - 900s (3m): ramp 500 -> 750 VU
+  // 900s - 1080s (3m): ramp 750 -> 1000 VU
+  // 1080s - 1200s (2m): cooldown 1000 -> 0 VU
+  if (elapsedSec < 120) return Math.max(1, Math.round(1 + (elapsedSec / 120) * 49));
+  if (elapsedSec < 300) return Math.round(50 + ((elapsedSec - 120) / 180) * 50);
+  if (elapsedSec < 480) return Math.round(100 + ((elapsedSec - 300) / 180) * 150);
+  if (elapsedSec < 720) return Math.round(250 + ((elapsedSec - 480) / 240) * 250);
+  if (elapsedSec < 900) return Math.round(500 + ((elapsedSec - 720) / 180) * 250);
+  if (elapsedSec < 1080) return Math.round(750 + ((elapsedSec - 900) / 180) * 250);
+  return 1000;
 }
 
 /**

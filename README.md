@@ -22,13 +22,14 @@ Suite pengujian beban (*stress test*) K6 untuk membandingkan kapasitas dan kesta
 ```text
 stress-test-llm/
 ├── .env / .env.example          # Kredensial endpoint Runpod & DGX (git-ignored)
-├── config.js                    # Endpoint & profil beban (sama untuk Runpod & DGX, maks 100 VU)
+├── config.js                    # Endpoint & profil beban (sama untuk Runpod & DGX, ramping s/d 1000 VU)
 ├── run_benchmark.sh             # Script runner otomatis
 ├── scripts/generate_payloads.js # Generator payload konteks 1k..64k
+├── scripts/backup_reports.sh    # Script backup laporan ke folder backup/
 ├── data/context_{1k,2k,4k,16k,32k,64k}.json
-├── scenarios/benchmark.js       # Skenario parametrik (CONTEXT, THINKING)
+├── scenarios/benchmark.js       # Skenario parametrik (CONTEXT, THINKING, threshold abort)
 ├── utils/
-│   ├── metrics.js               # Custom metrics (TTFT, TPS, retry, penyebab gagal)
+│   ├── metrics.js               # Custom metrics (TTFT, TPS, retry, breaking point VU)
 │   ├── request_helper.js        # HTTP POST + parser SSE + retry 3x
 │   ├── summary_reporter.js      # JSON summary per skenario
 │   └── consolidate_reports.js   # Generator laporan HTML + kesimpulan
@@ -44,8 +45,15 @@ stress-test-llm/
 | Short | 1k (baseline), 2k, 4k, 16k (mid) | ON & OFF |
 | Long | 32k, 64k (maksimum 64k) | ON & OFF |
 
-* **Profil beban sama untuk kedua server:** 1 → 10 → 25 → 50 → 75 → 100 VU → 0.
-* **Metrik Batas Kekuatan GPU (Breaking Point):** Mengukur titik konkurensi (VU) saat error/koneksi putus pertama kali terjadi, dan batas beban aman GPU.
+* **Profil beban sama untuk kedua server (20 Menit, Maks 1000 VU):**
+  * 0–2m: 1 $\rightarrow$ 50 VU (Warmup)
+  * 2–5m: 50 $\rightarrow$ 100 VU
+  * 5–8m: 100 $\rightarrow$ 250 VU
+  * 8–12m: 250 $\rightarrow$ 500 VU
+  * 12–15m: 500 $\rightarrow$ 750 VU
+  * 15–18m: 750 $\rightarrow$ 1000 VU (Puncak)
+  * 18–20m: 1000 $\rightarrow$ 0 VU (Cooldown)
+* **Threshold & Auto-Abort (15% Fail):** Tes otomatis berhenti (*abort*) seketika jika error rate melewati 15% untuk melindungi server dan mendeteksi titik jenuh (*breaking point*).
 * **Retry:** request yang kena OOM/overload/timeout/koneksi (HTTP 5xx, 429, timeout, tanpa respons) diulang hingga **3x**. Jika tetap gagal dinyatakan **FAILED**. Hanya error client 4xx yang tidak di-retry.
 * Skenario **PASSED** bila success rate final ≥ 95%. Setiap laporan HTML memiliki bagian **Kesimpulan** di bagian paling bawah.
 
@@ -82,7 +90,7 @@ npm run backup
 ./run_benchmark.sh full runpod
 ```
 
-Variabel opsional: `-e MAX_TOKENS=1024`, `-e MAX_RETRIES=3`, `-e TIMEOUT_MS=...` (default menyesuaikan ukuran konteks).
+Variabel opsional: `-e MAX_TOKENS=1024`, `-e MAX_RETRIES=3`, `-e TIMEOUT_MS=300000` (default seragam 300 detik untuk seluruh skenario).
 
 ---
 

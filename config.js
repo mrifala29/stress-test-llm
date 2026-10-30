@@ -30,10 +30,8 @@ function resolveApiKey() {
 export const SHORT_CONTEXTS = ['1k', '2k', '4k', '16k'];
 export const LONG_CONTEXTS = ['32k', '64k'];
 
-function timeoutForContext(ctx) {
-  const map = { '1k': 300000, '2k': 300000, '4k': 300000, '16k': 300000, '32k': 420000, '64k': 600000 };
-  return map[ctx] || 300000;
-}
+// Timeout request seragam: 300s (5 menit) untuk seluruh skenario (SLA standar)
+export const UNIFORM_TIMEOUT_MS = 300000;
 
 export const CONFIG = {
   // LLM Endpoint & Kredensial (Bisa per-profile atau via LLM_BASE_URL)
@@ -52,8 +50,8 @@ export const CONFIG = {
   // Streaming diaktifkan agar K6 bisa menghitung Time-To-First-Token (TTFT)
   STREAM: __ENV.STREAM === 'false' ? false : true,
 
-  // Timeout request per ukuran konteks (bisa dioverride via TIMEOUT_MS)
-  TIMEOUT_MS: __ENV.TIMEOUT_MS ? parseInt(__ENV.TIMEOUT_MS) : timeoutForContext(__ENV.CONTEXT || '1k'),
+  // Timeout request: seragam 300s (5 menit) untuk seluruh skenario agar adil & setara (bisa dioverride via TIMEOUT_MS)
+  TIMEOUT_MS: __ENV.TIMEOUT_MS ? parseInt(__ENV.TIMEOUT_MS) : UNIFORM_TIMEOUT_MS,
 
   // Retry untuk error OOM/overload/timeout/koneksi (5xx, 429, timeout, tanpa respons). Setelah itu dinyatakan FAILED.
   MAX_RETRIES: __ENV.MAX_RETRIES ? parseInt(__ENV.MAX_RETRIES) : 3,
@@ -81,17 +79,17 @@ export const LOAD_PROFILES = {
     ],
   },
 
-  // 2. Profil beban standar - dipakai SAMA untuk Runpod dan DGX (hingga 100 VU)
+  // 2. Profil beban standar - dipakai SAMA untuk Runpod dan DGX (hingga 1000 VU, total 20 menit)
   //    agar perbandingan head-to-head setara.
   standard: {
     stages: [
-      { duration: '1m', target: 1 },    // Baseline single user
-      { duration: '2m', target: 10 },
-      { duration: '2m', target: 25 },
-      { duration: '2m', target: 50 },
-      { duration: '2m', target: 75 },
-      { duration: '2m', target: 100 },  // Peak
-      { duration: '1m', target: 0 },    // Cooldown
+      { duration: '2m', target: 50 },   // Warmup ke 50 VUs
+      { duration: '3m', target: 100 },  // Naik ke 100 VUs
+      { duration: '3m', target: 250 },  // Naik ke 250 VUs
+      { duration: '4m', target: 500 },  // Beban menengah 500 VUs
+      { duration: '3m', target: 750 },  // Beban berat 750 VUs
+      { duration: '3m', target: 1000 }, // Puncak maksimal 1000 VUs
+      { duration: '2m', target: 0 },    // Cooldown bertahap ke 0 VUs
     ],
   },
 };

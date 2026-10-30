@@ -37,9 +37,28 @@ const dgxUrl = envVars.LLM_DGX_URL || envVars.LLM_BASE_URL || DEFAULT_URL;
 const modelName = envVars.LLM_MODEL || 'Qwen3.6-35B-A3B';
 
 // ---------- Definisi skenario ----------
-const SHORT_CONTEXTS = ['1k', '2k', '4k', '16k'];
+// Skenario ringkas aktif: 1k, 16k, dan 32k.
+// Konteks lain (2k, 4k, 64k) hanya disertakan jika datanya ada di reports/raw/ agar tabel tidak kosong melompong.
+const ALL_KNOWN_CONTEXTS = ['1k', '2k', '4k', '16k', '32k', '64k'];
+const DEFAULT_ACTIVE_CONTEXTS = ['1k', '16k', '32k'];
+
+const detectedContexts = new Set();
+if (fs.existsSync(rawDir)) {
+  const files = fs.readdirSync(rawDir);
+  for (const f of files) {
+    if (!f.endsWith('_summary.json')) continue;
+    for (const ctx of ALL_KNOWN_CONTEXTS) {
+      if (f.includes(`_${ctx}_`)) {
+        detectedContexts.add(ctx);
+      }
+    }
+  }
+}
+
+// Gunakan konteks yang ada datanya di raw/, atau default ke 1k, 16k, 32k
+const activeSet = detectedContexts.size > 0 ? detectedContexts : new Set(DEFAULT_ACTIVE_CONTEXTS);
+const CONTEXTS = ALL_KNOWN_CONTEXTS.filter((ctx) => activeSet.has(ctx));
 const LONG_CONTEXTS = ['32k', '64k'];
-const CONTEXTS = [...SHORT_CONTEXTS, ...LONG_CONTEXTS];
 
 const SCENARIOS = [];
 for (const ctx of CONTEXTS) {
@@ -90,9 +109,9 @@ function extractMetrics(summary) {
   const successRate = requests > 0 ? (passes / requests) * 100 : 0;
 
   const firstErrorVU = v('llm_first_error_vu', 'min', null);
-  const maxVUs = v('vus_max', 'value') || v('vus', 'max') || 100;
+  const maxVUs = v('vus_max', 'value') || v('vus', 'max') || 1000;
   let maxSafeVU = maxVUs;
-  let breakingPointText = 'Stabil s/d 100 VU';
+  let breakingPointText = `Stabil s/d ${maxVUs} VU`;
   if (firstErrorVU !== null && firstErrorVU !== undefined && firstErrorVU > 0) {
     const vuInt = Math.round(firstErrorVU);
     maxSafeVU = vuInt > 1 ? vuInt - 1 : 1;
@@ -153,7 +172,7 @@ function maxSafeBadge(x) {
     return `<span class="badge" style="background:rgba(245,158,11,0.2); color:#fbbf24; font-weight:700;">Kuat s/d ${x.maxSafeVU} VU</span> <span class="text-muted small">(${x.breakingPointText})</span>`;
   }
   if (x.status === 'PASSED') {
-    return `<span class="badge badge-success" style="font-weight:700;">Kuat 100 VU (Penuh)</span>`;
+    return `<span class="badge badge-success" style="font-weight:700;">Kuat ${x.maxVUs} VU (Penuh)</span>`;
   }
   return `<span class="text-muted">${x.breakingPointText}</span>`;
 }
@@ -322,7 +341,7 @@ function serverConclusion(server, results) {
 
   const verdict =
     t.failed === 0
-      ? `${server.label} stabil untuk seluruh skenario yang diuji pada beban hingga 100 VU.`
+      ? `${server.label} stabil untuk seluruh skenario yang diuji pada beban hingga 1000 VU.`
       : `${server.label} belum stabil pada ${t.failed} skenario; batasi konteks/konkurensi sesuai batas aman ${t.minSafeVU} VU di atas atau tambah kapasitas.`;
   return conclusionCard(bullets, verdict);
 }
@@ -478,7 +497,7 @@ function serverReport(profile, results) {
   }
   const body = `
     <div class="card">
-      <div class="card-title">Hasil Pengujian Beban (K6) — Maks 100 VU</div>
+      <div class="card-title">Hasil Pengujian Beban (K6) — Ramping s/d 1000 VU (20 Menit)</div>
       <table>
         <thead><tr><th>Skenario Uji</th><th>Status</th><th>Batas Kuat GPU</th><th>Success</th><th>TTFT</th><th>TPS</th><th>Retry</th><th>Penyebab Gagal</th><th>Beban</th></tr></thead>
         <tbody>${rows}</tbody>
@@ -514,7 +533,7 @@ function compareReport(rp, dg) {
   }
   const body = `
     <div class="card">
-      <div class="card-title">1. Matriks Hasil Pengujian Beban (K6) — Profil Beban Sama, Maks 100 VU</div>
+      <div class="card-title">1. Matriks Hasil Pengujian Beban (K6) — Profil Beban Sama, Ramping s/d 1000 VU (20 Menit)</div>
       <table>
         <thead>
           <tr>
@@ -550,7 +569,7 @@ function compareReport(rp, dg) {
   return page({
     title: 'Benchmark Head-to-Head: Server DGX vs Runpod (A6000)',
     heading: 'Hasil Evaluasi Head-to-Head: Server DGX vs Runpod (RTX A6000 Ada)',
-    subtitle: `Benchmark Kapasitas Inferensi &amp; Batas KV-Cache Model <strong>${modelName}</strong> (konteks 1k – 64k)`,
+    subtitle: `Benchmark Kapasitas Inferensi &amp; Batas KV-Cache Model <strong>${modelName}</strong> (konteks ${CONTEXTS.join(', ')})`,
     active: 'compare',
     endpoints: `<div class="endpoints-container">
         <div class="endpoint-card"><strong style="color:#fbbf24;">Runpod URL:</strong> <code>${runpodUrl}</code></div>

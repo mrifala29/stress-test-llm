@@ -19,8 +19,14 @@ const payloadData = JSON.parse(open(`../data/context_${CONTEXT}.json`));
 export const options = {
   ...getSelectedProfile(),
   thresholds: {
-    // Request dinyatakan FAILED setelah 3x retry; target SLA success rate > 95%
-    'llm_success_rate': ['rate>0.95'],
+    // Target SLA: success rate final (setelah retry) minimal 85%
+    'llm_success_rate': ['rate>=0.85'],
+
+    // OTOMATIS STOP (ABORT) jika error rate HTTP (5xx, timeout, noresp) melebihi 15%
+    // delayAbortEval: 1m agar tidak berhenti prematur di fase pemanasan awal
+    'http_req_failed': [
+      { threshold: 'rate<0.15', abortOnFail: true, delayAbortEval: '1m' },
+    ],
   },
 };
 
