@@ -31,7 +31,7 @@ export const SHORT_CONTEXTS = ['1k', '2k', '4k', '16k'];
 export const LONG_CONTEXTS = ['32k', '64k'];
 
 function timeoutForContext(ctx) {
-  const map = { '1k': 120000, '2k': 120000, '4k': 120000, '16k': 180000, '32k': 300000, '64k': 600000 };
+  const map = { '1k': 300000, '2k': 300000, '4k': 300000, '16k': 300000, '32k': 420000, '64k': 600000 };
   return map[ctx] || 300000;
 }
 
@@ -47,7 +47,7 @@ export const CONFIG = {
 
   // Parameter Inferensi
   TEMPERATURE: __ENV.TEMPERATURE ? parseFloat(__ENV.TEMPERATURE) : 0.7,
-  MAX_TOKENS: __ENV.MAX_TOKENS ? parseInt(__ENV.MAX_TOKENS) : 4096,
+  MAX_TOKENS: __ENV.MAX_TOKENS ? parseInt(__ENV.MAX_TOKENS) : 1024,
   
   // Streaming diaktifkan agar K6 bisa menghitung Time-To-First-Token (TTFT)
   STREAM: __ENV.STREAM === 'false' ? false : true,
@@ -55,7 +55,7 @@ export const CONFIG = {
   // Timeout request per ukuran konteks (bisa dioverride via TIMEOUT_MS)
   TIMEOUT_MS: __ENV.TIMEOUT_MS ? parseInt(__ENV.TIMEOUT_MS) : timeoutForContext(__ENV.CONTEXT || '1k'),
 
-  // Retry untuk error OOM/overload (5xx, 429, timeout). Setelah itu dinyatakan FAILED.
+  // Retry untuk error OOM/overload/timeout/koneksi (5xx, 429, timeout, tanpa respons). Setelah itu dinyatakan FAILED.
   MAX_RETRIES: __ENV.MAX_RETRIES ? parseInt(__ENV.MAX_RETRIES) : 3,
 
   getHeaders() {

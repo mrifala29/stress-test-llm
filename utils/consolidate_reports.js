@@ -89,6 +89,19 @@ function extractMetrics(summary) {
   const requests = passes + fails;
   const successRate = requests > 0 ? (passes / requests) * 100 : 0;
 
+  const firstErrorVU = v('llm_first_error_vu', 'min', null);
+  const maxVUs = v('vus_max', 'value') || v('vus', 'max') || 100;
+  let maxSafeVU = maxVUs;
+  let breakingPointText = 'Stabil s/d 100 VU';
+  if (firstErrorVU !== null && firstErrorVU !== undefined && firstErrorVU > 0) {
+    const vuInt = Math.round(firstErrorVU);
+    maxSafeVU = vuInt > 1 ? vuInt - 1 : 1;
+    breakingPointText = `Error pertama di ~${vuInt} VU`;
+  } else if (requests === 0) {
+    maxSafeVU = '-';
+    breakingPointText = '-';
+  }
+
   return {
     requests,
     passes,
@@ -108,10 +121,14 @@ function extractMetrics(summary) {
     retries: v('llm_retries', 'count'),
     failOom: v('llm_fail_oom_5xx', 'count'),
     failTimeout: v('llm_fail_timeout', 'count'),
+    failNoResp: v('llm_fail_noresp', 'count'),
     fail429: v('llm_fail_429', 'count'),
     fail4xx: v('llm_fail_4xx', 'count'),
+    firstErrorVU,
+    maxSafeVU,
+    breakingPointText,
     iterations: v('iterations', 'count'),
-    maxVUs: v('vus_max', 'value') || v('vus', 'max'),
+    maxVUs,
     status: requests > 0 && successRate >= PASS_THRESHOLD ? 'PASSED' : 'FAILED',
     raw: m,
   };
@@ -121,7 +138,7 @@ function extractMetrics(summary) {
 const fmt = (n, d = 0) => (n === null || n === undefined || Number.isNaN(n) ? '-' : Number(n).toFixed(d));
 const fmtSec = (ms) => (ms === null || ms === undefined ? '-' : `${(ms / 1000).toFixed(2)} s`);
 const fmtInt = (n) => (n === null || n === undefined ? '-' : Math.round(n).toLocaleString('id-ID'));
-const failedAttempts = (x) => x.failOom + x.failTimeout + x.fail429 + x.fail4xx;
+const failedAttempts = (x) => x.failOom + x.failTimeout + x.failNoResp + x.fail429 + x.fail4xx;
 
 function statusBadge(x) {
   if (!x) return '<span class="badge badge-neutral">NOT RUN</span>';
@@ -130,10 +147,22 @@ function statusBadge(x) {
     : '<span class="badge badge-danger">FAILED</span>';
 }
 
+function maxSafeBadge(x) {
+  if (!x || x.requests === 0) return '<span class="text-muted">-</span>';
+  if (x.firstErrorVU && x.firstErrorVU > 0) {
+    return `<span class="badge" style="background:rgba(245,158,11,0.2); color:#fbbf24; font-weight:700;">Kuat s/d ${x.maxSafeVU} VU</span> <span class="text-muted small">(${x.breakingPointText})</span>`;
+  }
+  if (x.status === 'PASSED') {
+    return `<span class="badge badge-success" style="font-weight:700;">Kuat 100 VU (Penuh)</span>`;
+  }
+  return `<span class="text-muted">${x.breakingPointText}</span>`;
+}
+
 function causeText(x) {
   const parts = [];
   if (x.failOom) parts.push(`OOM/5xx ${x.failOom}`);
   if (x.failTimeout) parts.push(`timeout ${x.failTimeout}`);
+  if (x.failNoResp) parts.push(`tanpa respons ${x.failNoResp}`);
   if (x.fail429) parts.push(`429 ${x.fail429}`);
   if (x.fail4xx) parts.push(`4xx ${x.fail4xx}`);
   return parts.length ? parts.join(', ') : '-';
@@ -230,7 +259,7 @@ function maxPassedContext(results, thinking) {
 }
 
 function totals(results) {
-  const t = { run: 0, passed: 0, failed: 0, retries: 0, oom: 0, timeout: 0, r429: 0, c4xx: 0, requests: 0, failedReq: 0 };
+  const t = { run: 0, passed: 0, failed: 0, retries: 0, oom: 0, timeout: 0, noresp: 0, r429: 0, c4xx: 0, requests: 0, failedReq: 0, minSafeVU: 100 };
   for (const sc of SCENARIOS) {
     const x = results[sc.id];
     if (!x) continue;
@@ -239,10 +268,14 @@ function totals(results) {
     t.retries += x.retries;
     t.oom += x.failOom;
     t.timeout += x.failTimeout;
+    t.noresp += x.failNoResp;
     t.r429 += x.fail429;
     t.c4xx += x.fail4xx;
     t.requests += x.requests;
     t.failedReq += x.fails;
+    if (typeof x.maxSafeVU === 'number' && x.maxSafeVU < t.minSafeVU) {
+      t.minSafeVU = x.maxSafeVU;
+    }
   }
   return t;
 }
@@ -263,6 +296,8 @@ function serverConclusion(server, results) {
   const bullets = [];
   bullets.push(`Dari <strong>${t.run}</strong> skenario yang dijalankan (maks ${SCENARIOS.length}), <strong class="text-success">${t.passed} PASSED</strong> dan <strong class="text-danger">${t.failed} FAILED</strong> (batas lulus: success rate final ≥ ${PASS_THRESHOLD}% setelah maksimal 3x retry).`);
 
+  bullets.push(`<strong>Batas Daya Tahan GPU (Kekuatan Beban VU):</strong> ${server.label} kuat menampung beban tanpa error hingga <strong>${t.minSafeVU} VU</strong> pada skenario terberat. Di atas batas tersebut mulai terjadi antrean / timeout / pemutusan koneksi.`);
+
   for (const thinking of [true, false]) {
     const best = maxPassedContext(results, thinking);
     const fail = firstFailure(results, thinking);
@@ -281,14 +316,14 @@ function serverConclusion(server, results) {
   }
 
   bullets.push(
-    `Kegagalan (per percobaan): OOM/5xx <strong>${t.oom}</strong>, timeout <strong>${t.timeout}</strong>, 429 <strong>${t.r429}</strong>, 4xx lain <strong>${t.c4xx}</strong>. Total retry dilakukan: <strong>${t.retries}</strong>; request yang tetap gagal setelah retry: <strong>${t.failedReq}</strong> dari ${fmtInt(t.requests)}.`
+    `Kegagalan (per percobaan): OOM/5xx <strong>${t.oom}</strong>, timeout streaming <strong>${t.timeout}</strong>, tanpa respons <strong>${t.noresp}</strong>, 429 <strong>${t.r429}</strong>, 4xx lain <strong>${t.c4xx}</strong>. Total retry dilakukan: <strong>${t.retries}</strong>; request yang tetap gagal setelah retry: <strong>${t.failedReq}</strong> dari ${fmtInt(t.requests)}.`
   );
   if (t.c4xx > 0) bullets.push('Terdapat error 4xx (tidak di-retry) — kemungkinan konteks + output melebihi batas <code>max-model-len</code> server.');
 
   const verdict =
     t.failed === 0
       ? `${server.label} stabil untuk seluruh skenario yang diuji pada beban hingga 100 VU.`
-      : `${server.label} belum stabil pada ${t.failed} skenario; batasi konteks/konkurensi sesuai konteks terbesar yang lulus di atas atau tambah kapasitas.`;
+      : `${server.label} belum stabil pada ${t.failed} skenario; batasi konteks/konkurensi sesuai batas aman ${t.minSafeVU} VU di atas atau tambah kapasitas.`;
   return conclusionCard(bullets, verdict);
 }
 
@@ -299,6 +334,8 @@ function compareConclusion(rp, dg) {
 
   const bullets = [];
   bullets.push(`Runpod: <strong class="text-success">${tr.passed} PASSED</strong> / <strong class="text-danger">${tr.failed} FAILED</strong> dari ${tr.run} skenario. DGX: <strong class="text-success">${td.passed} PASSED</strong> / <strong class="text-danger">${td.failed} FAILED</strong> dari ${td.run} skenario.`);
+
+  bullets.push(`<strong>Batas Daya Tahan GPU (Kekuatan Beban VU):</strong> Runpod kuat menahan beban hingga <strong>${tr.minSafeVU} VU</strong>, sedangkan DGX kuat menahan hingga <strong>${td.minSafeVU} VU</strong> sebelum error/koneksi putus pertama kali terjadi.`);
 
   for (const thinking of [true, false]) {
     const label = thinking ? 'Thinking ON' : 'Thinking OFF';
@@ -320,7 +357,7 @@ function compareConclusion(rp, dg) {
     bullets.push('Tidak ada skenario yang berhasil di kedua server, sehingga perbandingan TPS/TTFT belum dapat dibuat.');
   }
 
-  bullets.push(`Penyebab kegagalan — Runpod: OOM/5xx ${tr.oom}, timeout ${tr.timeout}, 429 ${tr.r429}, 4xx ${tr.c4xx}, retry ${tr.retries}. DGX: OOM/5xx ${td.oom}, timeout ${td.timeout}, 429 ${td.r429}, 4xx ${td.c4xx}, retry ${td.retries}.`);
+  bullets.push(`Penyebab kegagalan — Runpod: OOM/5xx ${tr.oom}, timeout ${tr.timeout}, tanpa respons ${tr.noresp}, 429 ${tr.r429}, 4xx ${tr.c4xx}, retry ${tr.retries}. DGX: OOM/5xx ${td.oom}, timeout ${td.timeout}, tanpa respons ${td.noresp}, 429 ${td.r429}, 4xx ${td.c4xx}, retry ${td.retries}.`);
 
   let verdict;
   if (td.run && tr.run) {
@@ -348,6 +385,7 @@ function scenarioReport(sc, profile, x) {
       <div class="card-title">Ringkasan</div>
       <div class="stats">
         <div class="stat"><div class="label">Status</div><div class="value">${statusBadge(x)}</div></div>
+        <div class="stat"><div class="label">Batas Kuat GPU</div><div class="value" style="color:#fbbf24;">${typeof x.maxSafeVU === 'number' ? x.maxSafeVU + ' VU' : '-'}</div><div class="text-muted small">${x.breakingPointText}</div></div>
         <div class="stat"><div class="label">Success rate (final)</div><div class="value ${x.status === 'PASSED' ? 'text-success' : 'text-danger'}">${fmt(x.successRate, 1)}%</div></div>
         <div class="stat"><div class="label">Total request</div><div class="value">${fmtInt(x.requests)}</div></div>
         <div class="stat"><div class="label">Request gagal (setelah 3x retry)</div><div class="value">${fmtInt(x.fails)}</div></div>
@@ -375,7 +413,8 @@ function scenarioReport(sc, profile, x) {
         <thead><tr><th>Penyebab (per percobaan)</th><th>Jumlah</th><th>Keterangan</th></tr></thead>
         <tbody>
           <tr><td>OOM / HTTP 5xx</td><td>${x.failOom}</td><td class="text-muted small">Di-retry hingga 3x</td></tr>
-          <tr><td>Timeout / koneksi terputus</td><td>${x.failTimeout}</td><td class="text-muted small">Di-retry hingga 3x</td></tr>
+          <tr><td>Timeout saat streaming / request timeout</td><td>${x.failTimeout}</td><td class="text-muted small">Di-retry hingga 3x</td></tr>
+          <tr><td>Tanpa respons / koneksi terputus</td><td>${x.failNoResp}</td><td class="text-muted small">Di-retry hingga 3x</td></tr>
           <tr><td>HTTP 429</td><td>${x.fail429}</td><td class="text-muted small">Di-retry hingga 3x</td></tr>
           <tr><td>HTTP 4xx lain</td><td>${x.fail4xx}</td><td class="text-muted small">Tidak di-retry (mis. konteks melebihi batas)</td></tr>
         </tbody>
@@ -426,13 +465,14 @@ function serverReport(profile, results) {
           <td>${statusBadge(x)}</td>
           ${
             x
-              ? `<td>${fmt(x.successRate, 1)}%</td>
+              ? `<td>${maxSafeBadge(x)}</td>
+          <td>${fmt(x.successRate, 1)}%</td>
           <td>${fmtSec(x.ttftAvg)} <span class="text-muted small">(p90: ${fmtSec(x.ttftP90)})</span></td>
           <td><strong>${fmt(x.tpsAvg, 1)}</strong> <span class="text-muted small">tps (peak: ${fmt(x.tpsMax, 1)})</span></td>
           <td>${x.retries}</td>
           <td class="small">${causeText(x)}</td>
           <td>${x.maxVUs} VUs</td>`
-              : '<td colspan="6" class="text-muted">Belum diuji</td>'
+              : '<td colspan="7" class="text-muted">Belum diuji</td>'
           }
         </tr>`;
   }
@@ -440,7 +480,7 @@ function serverReport(profile, results) {
     <div class="card">
       <div class="card-title">Hasil Pengujian Beban (K6) — Maks 100 VU</div>
       <table>
-        <thead><tr><th>Skenario Uji</th><th>Status</th><th>Success</th><th>TTFT</th><th>TPS</th><th>Retry</th><th>Penyebab Gagal</th><th>Beban</th></tr></thead>
+        <thead><tr><th>Skenario Uji</th><th>Status</th><th>Batas Kuat GPU</th><th>Success</th><th>TTFT</th><th>TPS</th><th>Retry</th><th>Penyebab Gagal</th><th>Beban</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -461,8 +501,8 @@ function compareReport(rp, dg) {
   let rows = '';
   const cell = (x, border = false) => {
     const b = border ? ' style="border-left: 2px solid #334155;"' : '';
-    if (!x) return `<td${b}>${statusBadge(x)}</td><td>-</td><td>-</td><td>-</td><td>-</td>`;
-    return `<td${b}>${statusBadge(x)}</td><td>${fmt(x.tpsAvg, 1)}</td><td>${fmtSec(x.ttftAvg)}</td><td>${fmt(x.successRate, 1)}%</td><td>${x.retries}</td>`;
+    if (!x) return `<td${b}>${statusBadge(x)}</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>`;
+    return `<td${b}>${statusBadge(x)}</td><td>${maxSafeBadge(x)}</td><td>${fmt(x.tpsAvg, 1)}</td><td>${fmtSec(x.ttftAvg)}</td><td>${fmt(x.successRate, 1)}%</td><td>${x.retries}</td>`;
   };
   for (const sc of SCENARIOS) {
     rows += `
@@ -479,17 +519,17 @@ function compareReport(rp, dg) {
         <thead>
           <tr>
             <th rowspan="2">Skenario Uji</th>
-            <th colspan="5" style="text-align:center; background: rgba(245,158,11,0.15); color:#fbbf24;">RUNPOD (RTX A6000 Ada - 48GB GDDR6)</th>
-            <th colspan="5" style="text-align:center; background: rgba(59,130,246,0.15); color:#60a5fa; border-left: 2px solid #334155;">SERVER DGX (High-VRAM HBM)</th>
+            <th colspan="6" style="text-align:center; background: rgba(245,158,11,0.15); color:#fbbf24;">RUNPOD (RTX A6000 Ada - 48GB GDDR6)</th>
+            <th colspan="6" style="text-align:center; background: rgba(59,130,246,0.15); color:#60a5fa; border-left: 2px solid #334155;">SERVER DGX (High-VRAM HBM)</th>
           </tr>
           <tr>
-            <th>Status</th><th>TPS</th><th>TTFT</th><th>Success</th><th>Retry</th>
-            <th style="border-left: 2px solid #334155;">Status</th><th>TPS</th><th>TTFT</th><th>Success</th><th>Retry</th>
+            <th>Status</th><th>Batas Kuat GPU</th><th>TPS</th><th>TTFT</th><th>Success</th><th>Retry</th>
+            <th style="border-left: 2px solid #334155;">Status</th><th>Batas Kuat GPU</th><th>TPS</th><th>TTFT</th><th>Success</th><th>Retry</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
-      <div class="text-muted small" style="margin-top:12px;">Request OOM/overload (5xx, 429, timeout) di-retry hingga 3x; jika tetap gagal dinyatakan FAILED. Skenario PASSED bila success rate final ≥ ${PASS_THRESHOLD}%.</div>
+      <div class="text-muted small" style="margin-top:12px;">Request OOM/overload/timeout/koneksi (5xx, 429, timeout, tanpa respons) di-retry hingga 3x; jika tetap gagal dinyatakan FAILED. Skenario PASSED bila success rate final ≥ ${PASS_THRESHOLD}%.</div>
     </div>
 
     <div class="card">

@@ -17,7 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, '..', 'data');
 
 const CHARS_PER_TOKEN = 3.8;
-const MAX_TOKENS = 4096; // harus sama dengan default CONFIG.MAX_TOKENS
+const MAX_TOKENS = 1024; // harus sama dengan default CONFIG.MAX_TOKENS
 const SIZES = { '1k': 1024, '2k': 2048, '4k': 4096, '16k': 16384, '32k': 32768, '64k': 65536 };
 
 const SYSTEM =

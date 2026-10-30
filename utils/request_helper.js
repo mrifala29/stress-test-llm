@@ -1,7 +1,10 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { CONFIG } from '../config.js';
-import { METRICS, recordMetrics, recordFailedAttempt, isRetryable, classifyStatus } from './metrics.js';
+import { METRICS, recordMetrics, recordFailedAttempt, isRetryable, classifyStatus, getEstimatedActiveVUs } from './metrics.js';
+
+// Catat waktu mulai modul k6 untuk estimasi tahap konkurensi (VU level)
+const MODULE_INIT_TIME = Date.now();
 
 /**
  * Eksekusi pengujian HTTP LLM ke /v1/chat/completions
@@ -51,8 +54,8 @@ export function executeLLMRequest({ messages, enableThinking, scenarioName = 'll
     }
   };
 
-  // Kirim request; untuk OOM/overload (5xx, 429, timeout) coba ulang hingga MAX_RETRIES kali.
-  // Jika tetap gagal dinyatakan FAILED. Error 4xx tidak di-retry.
+  // Kirim request; untuk OOM/overload/timeout/koneksi (5xx, 429, timeout, tanpa respons) coba ulang hingga MAX_RETRIES kali.
+  // Jika tetap gagal dinyatakan FAILED. Hanya error client 4xx yang tidak di-retry.
   const startTime = Date.now();
   let res;
   let attempt = 0;
@@ -60,10 +63,13 @@ export function executeLLMRequest({ messages, enableThinking, scenarioName = 'll
     res = http.post(CONFIG.BASE_URL, payloadString, params);
     if (res.status === 200) break;
 
-    recordFailedAttempt(res.status);
-    console.error(`[FAIL] ${scenarioName} attempt ${attempt + 1}/${CONFIG.MAX_RETRIES + 1} HTTP ${res.status} (${classifyStatus(res.status)}): ${res.body ? String(res.body).substring(0, 200) : 'No body'}`);
+    const elapsedSec = (Date.now() - MODULE_INIT_TIME) / 1000;
+    const activeVU = getEstimatedActiveVUs(elapsedSec, (__ENV.PROFILE || 'standard').toLowerCase());
 
-    if (!isRetryable(res.status) || attempt >= CONFIG.MAX_RETRIES) break;
+    recordFailedAttempt(res.status, res.body, activeVU);
+    console.error(`[FAIL] ${scenarioName} attempt ${attempt + 1}/${CONFIG.MAX_RETRIES + 1} at ~${activeVU} VUs HTTP ${res.status} (${classifyStatus(res.status, res.body)}): ${res.body ? String(res.body).substring(0, 200) : 'No body'}`);
+
+    if (!isRetryable(res.status, res.body) || attempt >= CONFIG.MAX_RETRIES) break;
     attempt++;
     METRICS.retries.add(1);
     sleep(2 * attempt); // backoff 2s, 4s, 6s

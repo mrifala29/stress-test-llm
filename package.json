@@ -9,6 +9,9 @@
     "payloads": "node scripts/generate_payloads.js",
     "test:runpod": "./run_benchmark.sh all runpod",
     "test:dgx": "./run_benchmark.sh all dgx",
+    "test:full:runpod": "./run_benchmark.sh full runpod",
+    "test:full:dgx": "./run_benchmark.sh full dgx",
+    "backup": "./scripts/backup_reports.sh",
     "report": "node utils/consolidate_reports.js",
     "clean": "./run_benchmark.sh clean"
   },

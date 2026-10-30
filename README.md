@@ -37,15 +37,16 @@ stress-test-llm/
 
 ---
 
-## 🧪 Skenario Uji (12 per server)
+## 🧪 Skenario Uji
 
 | Kategori | Konteks | Thinking |
 | :--- | :--- | :--- |
-| Short | 1k, 2k, 4k, 16k | ON & OFF |
+| Short | 1k (baseline), 2k, 4k, 16k (mid) | ON & OFF |
 | Long | 32k, 64k (maksimum 64k) | ON & OFF |
 
 * **Profil beban sama untuk kedua server:** 1 → 10 → 25 → 50 → 75 → 100 VU → 0.
-* **Retry:** request yang kena OOM/overload (HTTP 5xx, 429, timeout) diulang hingga **3x**. Jika tetap gagal dinyatakan **FAILED**. Error 4xx tidak di-retry.
+* **Metrik Batas Kekuatan GPU (Breaking Point):** Mengukur titik konkurensi (VU) saat error/koneksi putus pertama kali terjadi, dan batas beban aman GPU.
+* **Retry:** request yang kena OOM/overload/timeout/koneksi (HTTP 5xx, 429, timeout, tanpa respons) diulang hingga **3x**. Jika tetap gagal dinyatakan **FAILED**. Hanya error client 4xx yang tidak di-retry.
 * Skenario **PASSED** bila success rate final ≥ 95%. Setiap laporan HTML memiliki bagian **Kesimpulan** di bagian paling bawah.
 
 ---
@@ -54,18 +55,34 @@ stress-test-llm/
 
 Format: `./run_benchmark.sh [target] [profil: smoke|runpod|dgx]`
 
-Target: `1k|2k|4k|16k|32k|64k` (thinking ON & OFF), `<ctx>:on|off`, `short`, `long`, `all`.
+* **Target pilihan:**
+  * `all`: Skenario ringkas terpilih: **1k, 16k, 32k** (Thinking ON & OFF = 6 run).
+  * `full`: Seluruh 6 skenario lengkap: **1k, 2k, 4k, 16k, 32k, 64k** (12 run).
+  * `short`: 1k, 2k, 4k, 16k.
+  * `long`: 32k, 64k.
+  * `<ctx>` (misal `1k`): 1k Thinking ON & OFF.
+  * `<ctx>:on|off` (misal `16k:on`): satu skenario spesifik.
+  * `backup`: backup seluruh laporan ke folder `backup/`.
+  * `clean`: membersihkan seluruh laporan.
 
 ```bash
-node scripts/generate_payloads.js    # sekali, bila data/ belum ada
-./run_benchmark.sh 1k smoke          # sanity check
-./run_benchmark.sh short runpod      # 1k, 2k, 4k, 16k
-./run_benchmark.sh long runpod       # 32k, 64k
-./run_benchmark.sh 64k:on dgx        # satu skenario
-./run_benchmark.sh all dgx           # seluruh 12 skenario
+# Backup hasil saat ini
+npm run backup
+# atau: ./run_benchmark.sh backup
+
+# Sanity check smoke test
+./run_benchmark.sh 1k smoke
+
+# Jalankan skenario ringkas (1k, 16k, 32k) - otomatis clean data lama profil tersebut
+./run_benchmark.sh all dgx
+./run_benchmark.sh all runpod
+
+# Atau jalankan seluruh skenario lengkap (1k..64k)
+./run_benchmark.sh full dgx
+./run_benchmark.sh full runpod
 ```
 
-Variabel opsional: `-e MAX_TOKENS=4096`, `-e MAX_RETRIES=3`, `-e TIMEOUT_MS=...` (default menyesuaikan ukuran konteks).
+Variabel opsional: `-e MAX_TOKENS=1024`, `-e MAX_RETRIES=3`, `-e TIMEOUT_MS=...` (default menyesuaikan ukuran konteks).
 
 ---
 

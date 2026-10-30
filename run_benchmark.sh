@@ -7,15 +7,17 @@
 # target:
 #   <ctx>        satu ukuran konteks: 1k|2k|4k|16k|32k|64k  (thinking ON & OFF)
 #   <ctx>:on|off satu skenario spesifik, mis. 64k:off
+#   all          skenario ringkas terpilih: 1k, 16k, 32k (thinking ON & OFF)
+#   full         seluruh skenario lengkap: 1k, 2k, 4k, 16k, 32k, 64k
 #   short        1k, 2k, 4k, 16k
 #   long         32k, 64k
-#   all          semua ukuran (1k..64k)
-#   clean        hapus laporan
+#   backup       backup hasil laporan saat ini ke folder backup/
+#   clean        bersihkan seluruh laporan
 # Contoh:
 #   ./run_benchmark.sh 1k smoke
-#   ./run_benchmark.sh short runpod
-#   ./run_benchmark.sh 64k:on dgx
 #   ./run_benchmark.sh all dgx
+#   ./run_benchmark.sh all runpod
+#   ./run_benchmark.sh full dgx
 
 if [ -f .env ]; then
   set -a
@@ -23,8 +25,13 @@ if [ -f .env ]; then
   set +a
 fi
 
-TARGET=${1:-"1k"}
+TARGET=${1:-"all"}
 PROFILE=${2:-"smoke"}
+
+if [ "$1" = "backup" ]; then
+  ./scripts/backup_reports.sh
+  exit 0
+fi
 
 if [ "$1" = "clean" ]; then
   echo ">>> Membersihkan seluruh file laporan di folder 'reports/'..."
@@ -35,6 +42,11 @@ if [ "$1" = "clean" ]; then
 fi
 
 mkdir -p reports/raw
+
+# Otomatis bersihkan laporan lama untuk profile yang akan diuji agar data selalu fresh
+echo ">>> [AUTO-CLEAN] Membersihkan data laporan lama untuk profile '${PROFILE}'..."
+rm -f reports/raw/*_${PROFILE}_* reports/report_${PROFILE}.html
+echo "[OK] Data lama untuk '${PROFILE}' telah dibersihkan."
 
 if [ "$PROFILE" = "runpod" ] || [ "$PROFILE" = "a6000" ] || [ "$PROFILE" = "smoke_runpod" ]; then
   ACTIVE_URL="${LLM_RUNPOD_URL:-$LLM_BASE_URL}"
@@ -95,10 +107,17 @@ case "$TARGET" in
     for c in 32k 64k; do run_ctx $c; done
     ;;
   all)
+    # Skenario ringkas terpilih: 1k (short), 16k (mid), 32k (long)
+    echo ">>> Menjalankan skenario terpilih: 1k, 16k, dan 32k..."
+    for c in 1k 16k 32k; do run_ctx $c; done
+    ;;
+  full)
+    # Seluruh 6 skenario lengkap (1k..64k)
+    echo ">>> Menjalankan seluruh 6 skenario lengkap (1k..64k)..."
     for c in 1k 2k 4k 16k 32k 64k; do run_ctx $c; done
     ;;
   *)
-    echo "Target tidak valid! Gunakan: 1k|2k|4k|16k|32k|64k, <ctx>:on|off, short, long, all, clean"
+    echo "Target tidak valid! Gunakan: 1k|2k|4k|16k|32k|64k, <ctx>:on|off, all, full, short, long, backup, clean"
     exit 1
     ;;
 esac

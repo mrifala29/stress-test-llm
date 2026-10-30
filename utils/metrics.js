@@ -35,33 +35,72 @@ export const METRICS = {
 
   // Rincian penyebab kegagalan per percobaan (attempt)
   failOom: new Counter('llm_fail_oom_5xx'),      // HTTP 5xx (OOM / server error)
-  failTimeout: new Counter('llm_fail_timeout'),  // status 0 (timeout / koneksi terputus)
+  failTimeout: new Counter('llm_fail_timeout'),  // timeout saat respons sudah mulai mengalir (server lambat/antre)
+  failNoResp: new Counter('llm_fail_noresp'),    // status 0 tanpa respons sama sekali (koneksi ditolak/terputus)
   failRateLimit: new Counter('llm_fail_429'),    // HTTP 429 (overload / antrean penuh)
   failClient: new Counter('llm_fail_4xx'),       // HTTP 4xx lain (mis. konteks melebihi batas) - tidak di-retry
+
+  // Titik error pertama: estimasi active VU saat kegagalan/retry terjadi (Breaking Point VU)
+  firstErrorVU: new Trend('llm_first_error_vu', false),
 };
 
-/** Klasifikasi status HTTP: 'ok' | 'oom' | 'timeout' | 'ratelimit' | 'client' */
-export function classifyStatus(status) {
+/**
+ * Estimasi jumlah VU yang sedang aktif berdasarkan durasi berjalan (timeline ramping)
+ */
+export function getEstimatedActiveVUs(elapsedSec, profile = 'standard') {
+  if (profile === 'smoke' || profile === 'smoke_dgx' || profile === 'smoke_runpod') {
+    if (elapsedSec < 30) return 1;
+    if (elapsedSec < 60) return 2;
+    return 1;
+  }
+  // Profil beban standard (1 -> 100 VU):
+  // 0s - 60s: 1 VU
+  // 60s - 180s: ramp 1 -> 10 VU
+  // 180s - 300s: ramp 10 -> 25 VU
+  // 300s - 420s: ramp 25 -> 50 VU
+  // 420s - 540s: ramp 50 -> 75 VU
+  // 540s - 660s: ramp 75 -> 100 VU
+  // 660s - 720s: cooldown 100 -> 0 VU
+  if (elapsedSec < 60) return 1;
+  if (elapsedSec < 180) return Math.round(1 + ((elapsedSec - 60) / 120) * 9);
+  if (elapsedSec < 300) return Math.round(10 + ((elapsedSec - 180) / 120) * 15);
+  if (elapsedSec < 420) return Math.round(25 + ((elapsedSec - 300) / 120) * 25);
+  if (elapsedSec < 540) return Math.round(50 + ((elapsedSec - 420) / 120) * 25);
+  if (elapsedSec < 660) return Math.round(75 + ((elapsedSec - 540) / 120) * 25);
+  return 100;
+}
+
+/**
+ * Klasifikasi: 'ok' | 'oom' | 'timeout' | 'noresp' | 'ratelimit' | 'client'
+ * Status 0 dengan body parsial = timeout saat streaming.
+ */
+export function classifyStatus(status, body) {
   if (status === 200) return 'ok';
-  if (status === 0) return 'timeout';
+  if (status === 0) return body && body.length > 0 ? 'timeout' : 'noresp';
   if (status === 429) return 'ratelimit';
   if (status >= 500) return 'oom';
   return 'client';
 }
 
-/** Hanya OOM/overload yang di-retry */
-export function isRetryable(status) {
-  const c = classifyStatus(status);
-  return c === 'oom' || c === 'timeout' || c === 'ratelimit';
+/** Error server/overload/timeout/koneksi di-retry hingga 3x sesuai instruksi lead dev.
+ *  Hanya error client 4xx (misal parameter salah) yang tidak di-retry. */
+export function isRetryable(status, body) {
+  const c = classifyStatus(status, body);
+  return c === 'oom' || c === 'noresp' || c === 'ratelimit' || c === 'timeout';
 }
 
-/** Catat satu percobaan yang gagal */
-export function recordFailedAttempt(status) {
-  const c = classifyStatus(status);
+/** Catat satu percobaan yang gagal beserta estimasi VU saat kejadian */
+export function recordFailedAttempt(status, body, activeVU = 1) {
+  const c = classifyStatus(status, body);
   if (c === 'oom') METRICS.failOom.add(1);
   else if (c === 'timeout') METRICS.failTimeout.add(1);
+  else if (c === 'noresp') METRICS.failNoResp.add(1);
   else if (c === 'ratelimit') METRICS.failRateLimit.add(1);
   else if (c === 'client') METRICS.failClient.add(1);
+
+  if (activeVU > 0) {
+    METRICS.firstErrorVU.add(activeVU);
+  }
 }
 
 /**
