@@ -47,10 +47,18 @@ const SCENARIO_DEFS = [
   { id: '04_no_thinking_long_128k', name: 'Skenario 4: Thinking OFF + Long Context (128k)', shortName: 'Thinking OFF (128k)', thinking: false, context: '128k' },
 ];
 
+const rawDir = path.join(reportsDir, 'raw');
+if (!fs.existsSync(rawDir)) {
+  fs.mkdirSync(rawDir, { recursive: true });
+}
+
 function loadScenarioData(profile) {
   const results = {};
   for (const sc of SCENARIO_DEFS) {
-    const jsonPath = path.join(reportsDir, `${sc.id}_${profile}_summary.json`);
+    let jsonPath = path.join(rawDir, `${sc.id}_${profile}_summary.json`);
+    if (!fs.existsSync(jsonPath)) {
+      jsonPath = path.join(reportsDir, `${sc.id}_${profile}_summary.json`);
+    }
     if (fs.existsSync(jsonPath)) {
       try {
         const raw = fs.readFileSync(jsonPath, 'utf8');

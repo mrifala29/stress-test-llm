@@ -110,7 +110,14 @@ Setiap kali pengujian dijalankan, K6 dan generator laporan otomatis menghasilkan
 
 File `.html` ini bersifat *standalone* (dapat dibuka langsung di browser seperti Chrome, Safari, atau Firefox) dan dilengkapi tombol navigasi untuk berpindah antar laporan dengan satu klik.
 
-Untuk me-refresh atau membuat ulang laporan kapan saja, jalankan:
-```bash
-npm run report
-```
+* Seluruh data mentah JSON dan laporan rincian per skenario disimpan terpisah di subfolder `reports/raw/` sehingga folder kerja tetap rapi.
+* Untuk me-refresh atau membuat ulang laporan kapan saja:
+  ```bash
+  npm run report
+  ```
+* Untuk membersihkan dan me-reset seluruh laporan pengujian:
+  ```bash
+  npm run clean
+  # atau:
+  ./run_benchmark.sh clean
+  ```

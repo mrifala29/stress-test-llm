@@ -15,11 +15,11 @@ export function generateSummaryReport(data, scenarioName) {
   
   const outputs = {
     stdout: textSummary(data, { indent: ' ', enableColors: true }),
-    [`reports/${filePrefix}_summary.json`]: JSON.stringify(data, null, 2),
+    [`reports/raw/${filePrefix}_summary.json`]: JSON.stringify(data, null, 2),
   };
 
   try {
-    outputs[`reports/${filePrefix}_report.html`] = htmlReport(data, {
+    outputs[`reports/raw/${filePrefix}_report.html`] = htmlReport(data, {
       title: `LLM Benchmark [${profile.toUpperCase()}] - ${scenarioName}`,
     });
   } catch (err) {

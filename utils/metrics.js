@@ -12,8 +12,8 @@ export const METRICS = {
   // Latensi waktu hingga token pertama diterima (Time to First Token) dalam ms
   ttft: new Trend('llm_ttft_ms', true),
 
-  // Kecepatan pembuatan token (Tokens per second / TPS per stream)
-  tokensPerSecond: new Trend('llm_tokens_per_second', true),
+  // Kecepatan pembuatan token (Tokens per second / TPS per stream) - bukan waktu (isTime = false)
+  tokensPerSecond: new Trend('llm_tokens_per_second', false),
 
   // Total durasi siklus inferensi dari kirim request sampai token selesai (ms)
   e2eDuration: new Trend('llm_e2e_duration_ms', true),
@@ -27,7 +27,7 @@ export const METRICS = {
   // Total akumulasi tokens (prompt + completion)
   totalTokens: new Counter('llm_total_tokens'),
 
-  // Rate error kegagalan server / OOM (HTTP 500, 502, 503, 504, 429)
+  // Rate error kegagalan server / OOM / timeout (HTTP 500, 502, 503, 504, 429, atau 0)
   oomFailures: new Rate('llm_oom_failures'),
 
   // Rate keberhasilan request (HTTP 200)
@@ -41,8 +41,8 @@ export function recordMetrics({ status, ttftMs, e2eDurationMs, completionTokens,
   const isSuccess = status === 200;
   METRICS.successfulRequests.add(isSuccess);
 
-  // Jika status 5xx atau 429, tandai sebagai OOM / overload failure
-  if (status >= 500 || status === 429) {
+  // Jika status 5xx, 429, atau 0 (timeout / connection aborted karena overload), tandai sebagai failure
+  if (status >= 500 || status === 429 || status === 0) {
     METRICS.oomFailures.add(1);
   } else {
     METRICS.oomFailures.add(0);

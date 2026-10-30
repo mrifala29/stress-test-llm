@@ -43,8 +43,8 @@ export const CONFIG = {
   // Streaming diaktifkan agar K6 bisa menghitung Time-To-First-Token (TTFT)
   STREAM: __ENV.STREAM === 'false' ? false : true,
 
-  // Timeout request (180s untuk long context 128k)
-  TIMEOUT_MS: __ENV.TIMEOUT_MS ? parseInt(__ENV.TIMEOUT_MS) : 180000,
+  // Timeout request (300s / 5 menit untuk concurrent queue & long context 128k)
+  TIMEOUT_MS: __ENV.TIMEOUT_MS ? parseInt(__ENV.TIMEOUT_MS) : 300000,
 
   getHeaders() {
     return {

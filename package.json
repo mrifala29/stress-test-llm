@@ -9,7 +9,8 @@
     "test:runpod": "./run_benchmark.sh 1 runpod",
     "test:dgx": "./run_benchmark.sh 1 dgx",
     "test:all": "./run_benchmark.sh all dgx",
-    "report": "node utils/consolidate_reports.js"
+    "report": "node utils/consolidate_reports.js",
+    "clean": "./run_benchmark.sh clean"
   },
   "keywords": [
     "k6",

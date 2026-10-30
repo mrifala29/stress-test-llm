@@ -9,8 +9,6 @@
 #   ./run_benchmark.sh 2 dgx
 #   ./run_benchmark.sh all dgx
 
-set -e
-
 # Otomatis muat environment variables dari file .env jika ada
 if [ -f .env ]; then
   set -a
@@ -21,7 +19,16 @@ fi
 SCENARIO=${1:-"1"}
 PROFILE=${2:-"smoke"}
 
-mkdir -p reports
+if [ "$1" = "clean" ]; then
+  echo ">>> Membersihkan seluruh file laporan di folder 'reports/'..."
+  rm -rf reports/*
+  mkdir -p reports/raw
+  node utils/consolidate_reports.js > /dev/null 2>&1 || true
+  echo "[OK] Folder 'reports/' sudah bersih dan direset ke kondisi awal."
+  exit 0
+fi
+
+mkdir -p reports/raw
 
 if [ "$PROFILE" = "runpod" ] || [ "$PROFILE" = "a6000" ] || [ "$PROFILE" = "smoke_runpod" ]; then
   ACTIVE_URL="${LLM_RUNPOD_URL:-$LLM_BASE_URL}"
@@ -47,12 +54,15 @@ run_k6() {
   echo ""
   echo ">>> [RUNNING] $name (Profile: $PROFILE)"
 
-  local k6_args=(-e "PROFILE=$PROFILE")
-  if [ -n "$PROMETHEUS_REMOTE_WRITE_URL" ] && [ "$DISABLE_PROMETHEUS" != "true" ]; then
-    k6_args+=(-o "experimental-prometheus-rw=$PROMETHEUS_REMOTE_WRITE_URL")
-  fi
-
-  k6 run "${k6_args[@]}" "$script"
+  # Jalankan K6 tanpa abort jika threshold SLA terlampaui (exit code 99 biasa terjadi pada stress test)
+  k6 run -e "PROFILE=$PROFILE" "$script" || {
+    local exit_code=$?
+    if [ $exit_code -eq 99 ]; then
+      echo ">>> [CATATAN] Ambang batas (SLA Thresholds) terlewati pada $name (Exit Code 99: Overload/Degraded)."
+    else
+      echo ">>> [PERINGATAN] $name selesai dengan exit code $exit_code."
+    fi
+  }
 }
 
 case "$SCENARIO" in
